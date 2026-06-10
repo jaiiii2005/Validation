@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 
 DATA_FILE = "study_log.json"
+DAILY_GOAL = 4  # target study hours per day during the sprint
 
 
 def load_sessions():
@@ -45,6 +46,9 @@ def show_summary():
 
     total = sum(s["hours"] for s in sessions)
 
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_hours = sum(s["hours"] for s in sessions if s["date"] == today)
+
     week_ago = datetime.now() - timedelta(days=7)
     this_week = sum(
         s["hours"]
@@ -56,7 +60,14 @@ def show_summary():
     print(f"Total sessions : {len(sessions)}")
     print(f"Total hours    : {total}")
     print(f"Last 7 days    : {this_week}h")
-    print("---------------------\n")
+    print(f"Today          : {today_hours}h / {DAILY_GOAL}h goal")
+    print("---------------------")
+
+    if today_hours >= DAILY_GOAL:
+        print("[DONE] Daily goal hit! Nice work.\n")
+    else:
+        remaining = DAILY_GOAL - today_hours
+        print(f"[..] {remaining}h left to hit today's goal.\n")
 
 
 def main():
