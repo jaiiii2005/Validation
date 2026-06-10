@@ -1,59 +1,48 @@
-# Validation
+# Validation — Practice & Tools
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.3.
+A workspace where I build small, real things while learning to develop software
+with AI tools. It contains an Angular practice app and a set of standalone
+Python tools. The goal is shipping working things, not collecting tutorials.
 
-## Development server
+## 🛠️ Python Tools
 
-To start a local development server, run:
+### Study Tracker (`study_tracker.py`)
 
+A command-line tool to log study sessions and track how many hours I put in —
+built to keep myself accountable while learning.
+
+**Features**
+- Log a study session (topic + hours)
+- Saves sessions to a local file so they persist between runs
+- Shows total hours and hours studied in the last 7 days
+
+**Run it**
 ```bash
-ng serve
+python study_tracker.py
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
+You'll get a simple menu:
+```
+1) Log a study session
+2) Show summary
+3) Quit
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+> Personal data is stored in `study_log.json`, which is intentionally kept out
+> of version control (see `.gitignore`).
+
+## 🅰️ Angular App
+
+An Angular 21 single-page app (standalone components) used for front-end practice.
 
 ```bash
-ng generate --help
+npm start        # run dev server at http://localhost:4200/
+npm run build    # production build to dist/
+npm test         # run unit tests (Vitest)
 ```
 
-## Building
+## 🚀 About
 
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+I'm learning to build useful software with AI, focused on shipping real, working
+things rather than collecting certificates. This repo is where that practice
+lives — it will grow as I build more.
