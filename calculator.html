@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scientific Calculator</title>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .calc {
+      background: #1e293b;
+      border-radius: 18px;
+      padding: 22px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+    h1 { font-size: 1.05rem; color: #94a3b8; font-weight: 600; margin-bottom: 12px; text-align: center; }
+
+    .display {
+      background: #0b1220;
+      border-radius: 12px;
+      padding: 18px 16px;
+      min-height: 70px;
+      text-align: right;
+      font-size: 1.7rem;
+      font-variant-numeric: tabular-nums;
+      word-break: break-all;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 9px;
+    }
+    button {
+      border: none;
+      border-radius: 11px;
+      padding: 15px 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #e2e8f0;
+      background: #334155;
+    }
+    button:hover { opacity: 0.85; }
+    .fn { background: #273449; color: #94a3b8; font-size: 0.95rem; }
+    .op { background: #1e40af; }
+    .clear { background: #7f1d1d; }
+    .back { background: #7f1d1d; }
+    .equals {
+      grid-column: 1 / -1;
+      background: #38bdf8;
+      color: #04283b;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="calc">
+    <h1>Scientific Calculator</h1>
+    <div class="display" id="display">0</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <script>
+    let expr = "";
+    const display = document.getElementById("display");
+    const grid = document.getElementById("grid");
+
+    // Each button: [label, type]. Type only controls the colour/styling.
+    const buttons = [
+      ["sin(", "fn"], ["cos(", "fn"], ["tan(", "fn"], ["(", "fn"], [")", "fn"],
+      ["ln(", "fn"],  ["log(", "fn"], ["√(", "fn"], ["^", "fn"], ["!", "fn"],
+      ["π", "fn"], ["e", "fn"],  ["%", "fn"],  ["C", "clear"], ["⌫", "back"],
+      ["7", "num"], ["8", "num"], ["9", "num"], ["÷", "op"], ["×", "op"],
+      ["4", "num"], ["5", "num"], ["6", "num"], ["-", "op"],       ["+", "op"],
+      ["1", "num"], ["2", "num"], ["3", "num"], ["0", "num"],      [".", "num"],
+    ];
+
+    // Build all the buttons from the array above.
+    for (const [label, type] of buttons) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.className = type;
+      b.onclick = () => handle(label);
+      grid.appendChild(b);
+    }
+    // The equals button spans the whole last row.
+    const eq = document.createElement("button");
+    eq.textContent = "=";
+    eq.className = "equals";
+    eq.onclick = evaluate;
+    grid.appendChild(eq);
+
+    // Decide what a button press does.
+    function handle(label) {
+      if (label === "C") { expr = ""; }
+      else if (label === "⌫") { expr = expr.slice(0, -1); } // backspace
+      else { expr += label; }
+      updateDisplay();
+    }
+
+    function updateDisplay() {
+      display.textContent = expr || "0";
+    }
+
+    // factorial helper, e.g. fact(5) = 120
+    function fact(n) {
+      n = Math.round(n);
+      if (n < 0 || !isFinite(n)) return NaN;
+      let r = 1;
+      for (let i = 2; i <= n; i++) r *= i;
+      return r;
+    }
+
+    // Turn the on-screen expression into real JavaScript math, then run it.
+    function toJS(s) {
+      let js = s
+        .replaceAll("sin(", "Math.sin(")
+        .replaceAll("cos(", "Math.cos(")
+        .replaceAll("tan(", "Math.tan(")
+        .replaceAll("log(", "Math.log10(")
+        .replaceAll("ln(", "Math.log(")
+        .replaceAll("√(", "Math.sqrt(")
+        .replaceAll("π", "Math.PI")
+        .replaceAll("e", "Math.E")
+        .replaceAll("^", "**")
+        .replaceAll("×", "*")
+        .replaceAll("÷", "/")
+        .replaceAll("%", "/100");
+      js = js.replace(/(\d+\.?\d*)!/g, "fact($1)");
+      return js;
+    }
+
+    function evaluate() {
+      if (!expr) return;
+      try {
+        const js = toJS(expr);
+        let result = Function("fact", "return (" + js + ")")(fact);
+        if (typeof result !== "number" || !isFinite(result)) throw new Error("bad");
+        result = Math.round(result * 1e10) / 1e10; // clean up tiny float errors
+        expr = String(result);
+        updateDisplay();
+      } catch (err) {
+        display.textContent = "Error";
+        expr = "";
+      }
+    }
+  </script>
+</body>
+</html>
