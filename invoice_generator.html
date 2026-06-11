@@ -22,12 +22,13 @@
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
     }
 
+    #logo { max-height: 70px; max-width: 220px; margin-bottom: 16px; display: none; }
     h1 { font-size: 2rem; color: #2563eb; letter-spacing: 1px; }
     .row { display: flex; gap: 24px; flex-wrap: wrap; }
     .col { flex: 1; min-width: 220px; }
     .block { margin-top: 24px; }
     label { display: block; font-size: 0.75rem; text-transform: uppercase; color: #64748b; margin: 10px 0 3px; letter-spacing: 0.5px; }
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid #cbd5e1;
@@ -45,46 +46,63 @@
     .amount { text-align: right; font-variant-numeric: tabular-nums; }
     .right { text-align: right; }
 
-    .totals { margin-top: 16px; margin-left: auto; width: 280px; }
+    .totals { margin-top: 16px; margin-left: auto; width: 300px; }
     .totals .line { display: flex; justify-content: space-between; padding: 6px 0; }
     .totals .grand { border-top: 2px solid #e2e8f0; margin-top: 6px; padding-top: 10px; font-size: 1.25rem; font-weight: 700; color: #2563eb; }
 
-    button {
-      border: none;
-      border-radius: 7px;
-      padding: 9px 14px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
+    button { border: none; border-radius: 7px; padding: 9px 14px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
     .btn-add { background: #e0e7ff; color: #3730a3; margin-top: 12px; }
     .btn-del { background: #fee2e2; color: #b91c1c; padding: 4px 10px; }
-    .toolbar { max-width: 800px; margin: 0 auto 16px; display: flex; gap: 10px; justify-content: flex-end; }
+    .toolbar {
+      max-width: 800px;
+      margin: 0 auto 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .toolbar label.upload {
+      background: #e2e8f0; color: #0f172a; padding: 9px 14px; border-radius: 7px;
+      font-weight: 600; font-size: 0.9rem; cursor: pointer; margin: 0;
+      text-transform: none; letter-spacing: 0;
+    }
+    .toolbar .cur { width: auto; }
     .btn-print { background: #2563eb; color: #fff; }
 
-    /* When printing, hide the buttons and the page background */
     @media print {
       body { background: #fff; padding: 0; }
       .sheet { box-shadow: none; max-width: 100%; }
       .toolbar, .btn-add, .btn-del { display: none !important; }
       td input { border: none; }
-      th:last-child, td:last-child { display: none; } /* hide the delete column */
+      th:last-child, td:last-child { display: none; }
     }
   </style>
 </head>
 
 <body>
-  <!-- Buttons (hidden when printing) -->
+  <!-- Buttons + settings (hidden when printing) -->
   <div class="toolbar">
+    <label class="upload">
+      Upload logo
+      <input id="logoInput" type="file" accept="image/*" style="display:none" onchange="loadLogo(event)" />
+    </label>
+    <select class="cur" id="currency" onchange="onCurrencyChange()">
+      <option value="₹">₹ INR</option>
+      <option value="$">$ USD</option>
+      <option value="€">€ EUR</option>
+      <option value="£">£ GBP</option>
+    </select>
     <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
   </div>
 
   <div class="sheet">
+    <img id="logo" alt="logo" />
     <div class="row">
       <div class="col">
         <h1>INVOICE</h1>
         <label>From (your business)</label>
-        <textarea id="from" placeholder="Your Name / Business&#10;Address&#10;Phone &middot; Email"></textarea>
+        <textarea id="from" placeholder="Your Name / Business&#10;Address&#10;Phone &middot; Email" oninput="saveBusiness()"></textarea>
       </div>
       <div class="col">
         <label>Bill to (client)</label>
@@ -119,19 +137,20 @@
     </div>
 
     <div class="totals">
-      <div class="line"><span>Subtotal</span><span id="subtotal">0.00</span></div>
+      <div class="line"><span>Subtotal</span><span id="subtotal"></span></div>
       <div class="line">
         <span>Tax (%) <input id="taxRate" type="number" value="0" style="width:60px; display:inline-block; padding:2px 6px;" oninput="recalc()" /></span>
-        <span id="taxAmt">0.00</span>
+        <span id="taxAmt"></span>
       </div>
-      <div class="line grand"><span>Total</span><span id="grand">0.00</span></div>
+      <div class="line grand"><span>Total</span><span id="grand"></span></div>
     </div>
   </div>
 
   <script>
     const itemsBody = document.getElementById("items");
+    let CUR = "₹"; // current currency symbol
 
-    // Add a new line-item row to the table.
+    // ----- Line items -----
     function addRow(desc = "", qty = 1, rate = 0) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -144,7 +163,6 @@
       recalc();
     }
 
-    // Recalculate every row amount, the subtotal, tax, and grand total.
     function recalc() {
       let subtotal = 0;
       for (const tr of itemsBody.querySelectorAll("tr")) {
@@ -152,17 +170,63 @@
         const rate = parseFloat(tr.querySelector(".rate").value) || 0;
         const amount = qty * rate;
         subtotal += amount;
-        tr.querySelector(".amount").textContent = amount.toFixed(2);
+        tr.querySelector(".amount").textContent = CUR + amount.toFixed(2);
       }
       const taxRate = parseFloat(document.getElementById("taxRate").value) || 0;
       const taxAmt = subtotal * (taxRate / 100);
-
-      document.getElementById("subtotal").textContent = subtotal.toFixed(2);
-      document.getElementById("taxAmt").textContent = taxAmt.toFixed(2);
-      document.getElementById("grand").textContent = (subtotal + taxAmt).toFixed(2);
+      document.getElementById("subtotal").textContent = CUR + subtotal.toFixed(2);
+      document.getElementById("taxAmt").textContent = CUR + taxAmt.toFixed(2);
+      document.getElementById("grand").textContent = CUR + (subtotal + taxAmt).toFixed(2);
     }
 
-    // Start with today's date and two example rows.
+    // ----- Logo upload -----
+    // Read the chosen image file as a data URL, show it, and remember it.
+    function loadLogo(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const logo = document.getElementById("logo");
+        logo.src = reader.result;
+        logo.style.display = "block";
+        localStorage.setItem("invoiceLogo", reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ----- Currency -----
+    function onCurrencyChange() {
+      CUR = document.getElementById("currency").value;
+      localStorage.setItem("invoiceCurrency", CUR);
+      recalc();
+    }
+
+    // ----- Remember business details -----
+    function saveBusiness() {
+      localStorage.setItem("invoiceFrom", document.getElementById("from").value);
+    }
+
+    // Load any saved settings when the page opens.
+    function restore() {
+      const savedFrom = localStorage.getItem("invoiceFrom");
+      if (savedFrom) document.getElementById("from").value = savedFrom;
+
+      const savedLogo = localStorage.getItem("invoiceLogo");
+      if (savedLogo) {
+        const logo = document.getElementById("logo");
+        logo.src = savedLogo;
+        logo.style.display = "block";
+      }
+
+      const savedCur = localStorage.getItem("invoiceCurrency");
+      if (savedCur) {
+        CUR = savedCur;
+        document.getElementById("currency").value = savedCur;
+      }
+    }
+
+    // ----- Start -----
+    restore();
     document.getElementById("date").valueAsDate = new Date();
     addRow("Design work", 1, 5000);
     addRow("Consultation (hours)", 2, 1500);
