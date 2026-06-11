@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jai — AI Builder</title>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --accent2: #818cf8;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+    /* ===== Hero ===== */
+    header {
+      padding: 80px 0 48px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: var(--accent);
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 4px 14px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+    h1 .grad {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .lead { color: var(--muted); font-size: 1.15rem; max-width: 600px; margin: 0 auto 28px; }
+
+    .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      text-decoration: none;
+      padding: 11px 20px;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .btn-primary { background: var(--accent); color: #04283b; }
+    .btn-ghost { border: 1px solid #334155; color: var(--text); }
+    .btn:hover { opacity: 0.9; }
+
+    /* ===== Sections ===== */
+    section { padding: 36px 0; }
+    h2 { font-size: 1.4rem; margin-bottom: 18px; }
+    .about p { color: var(--muted); }
+
+    .projects { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 640px) { .projects { grid-template-columns: 1fr; } }
+    .project {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 22px;
+      border: 1px solid #273449;
+    }
+    .project h3 { margin-bottom: 6px; font-size: 1.1rem; }
+    .project .tag { font-size: 0.75rem; color: var(--accent); margin-bottom: 10px; }
+    .project p { color: var(--muted); font-size: 0.92rem; margin-bottom: 14px; }
+    .project a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-right: 16px;
+    }
+    .project a:hover { text-decoration: underline; }
+
+    footer {
+      text-align: center;
+      padding: 40px 0 60px;
+      color: var(--muted);
+      border-top: 1px solid #273449;
+      margin-top: 24px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <!-- ===== Hero ===== -->
+    <header>
+      <span class="badge">Available for work &amp; freelance</span>
+      <h1>Hi, I'm Jai — I build <span class="grad">useful tools with AI</span>.</h1>
+      <p class="lead">
+        I turn real problems into working software, powered by AI. Here are some
+        of the things I've built.
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#projects">View my work</a>
+        <a class="btn btn-ghost" href="https://github.com/jaiiii2005">GitHub</a>
+        <a class="btn btn-ghost" href="mailto:jjmehta2005@gmail.com">Email me</a>
+      </div>
+    </header>
+
+    <!-- ===== About ===== -->
+    <section class="about">
+      <h2>About</h2>
+      <p>
+        I'm a developer focused on building practical, AI-powered tools and web
+        apps. I learn by doing &mdash; shipping real projects rather than just
+        studying theory. I'm growing my skills in Python, web development, and
+        building with the Claude API, and I'm always working on something new.
+      </p>
+    </section>
+
+    <!-- ===== Projects ===== -->
+    <section id="projects">
+      <h2>Projects</h2>
+      <div class="projects">
+
+        <div class="project">
+          <h3>Study Tracker</h3>
+          <div class="tag">Web App &middot; HTML / CSS / JavaScript</div>
+          <p>
+            A browser app to log study sessions and track daily-goal progress.
+            Saves your data right in the browser &mdash; no login needed.
+          </p>
+          <a href="study_tracker.html">Live demo &rarr;</a>
+          <a href="https://github.com/jaiiii2005/Validation/blob/main/study_tracker.html">Code</a>
+        </div>
+
+        <div class="project">
+          <h3>AI Study Buddy</h3>
+          <div class="tag">Python &middot; Claude API</div>
+          <p>
+            A command-line tutor powered by Claude. Ask it anything about what
+            you're learning and it explains it simply, like a friendly teacher.
+          </p>
+          <a href="https://github.com/jaiiii2005/Validation/blob/main/study_buddy.py">Code &rarr;</a>
+        </div>
+
+        <div class="project">
+          <h3>Study Tracker (CLI)</h3>
+          <div class="tag">Python</div>
+          <p>
+            The original command-line version: logs sessions to a file and
+            reports total hours and progress toward a daily goal.
+          </p>
+          <a href="https://github.com/jaiiii2005/Validation/blob/main/study_tracker.py">Code &rarr;</a>
+        </div>
+
+        <div class="project">
+          <h3>More coming soon</h3>
+          <div class="tag">In progress</div>
+          <p>
+            I'm actively building new tools. Check my GitHub for the latest, or
+            get in touch if you'd like something built.
+          </p>
+          <a href="https://github.com/jaiiii2005">My GitHub &rarr;</a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== Footer ===== -->
+    <footer>
+      <p>
+        Let's build something &mdash;
+        <a href="mailto:jjmehta2005@gmail.com">jjmehta2005@gmail.com</a>
+        &middot;
+        <a href="https://github.com/jaiiii2005">github.com/jaiiii2005</a>
+      </p>
+    </footer>
+
+  </div>
+</body>
+</html>
