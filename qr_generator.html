@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Generator</title>
+
+  <!-- A free QR-code library, loaded from a CDN (someone else's code we reuse). -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    p.sub { color: #94a3b8; margin-bottom: 22px; font-size: 0.95rem; }
+
+    label { display: block; text-align: left; font-size: 0.8rem; color: #94a3b8; margin-bottom: 5px; }
+    input {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1px solid #334155;
+      border-radius: 9px;
+      background: #0b1220;
+      color: #e2e8f0;
+      font-size: 1rem;
+      margin-bottom: 18px;
+    }
+
+    /* The white box that holds the QR image (white so it scans well). */
+    #qr {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      padding: 14px;
+      border-radius: 12px;
+      min-height: 60px;
+      margin-bottom: 18px;
+    }
+    #qr:empty::after { content: "Your QR code will appear here"; color: #94a3b8; font-size: 0.85rem; padding: 20px; }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 9px;
+      background: #38bdf8;
+      color: #04283b;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>QR Code Generator</h1>
+    <p class="sub">Turn any link or text into a scannable QR code.</p>
+
+    <label for="text">Link or text</label>
+    <input id="text" type="text" placeholder="https://your-website.com" oninput="generate()" />
+
+    <div id="qr"></div>
+
+    <button id="download" onclick="downloadPNG()" disabled>Download PNG</button>
+  </div>
+
+  <script>
+    const qrBox = document.getElementById("qr");
+    const downloadBtn = document.getElementById("download");
+
+    // Create one QR object tied to the white box. We reuse it for every update.
+    const qrcode = new QRCode(qrBox, { width: 240, height: 240 });
+
+    // Called on every keystroke: redraw the QR for whatever is typed.
+    function generate() {
+      const text = document.getElementById("text").value.trim();
+      if (!text) {
+        qrcode.clear();          // library method: wipe the current code
+        qrBox.innerHTML = "";    // also clear leftover canvas/img so the hint shows
+        downloadBtn.disabled = true;
+        return;
+      }
+      qrcode.makeCode(text);     // library method: draw a QR for this text
+      downloadBtn.disabled = false;
+    }
+
+    // Save the QR as a PNG image file.
+    function downloadPNG() {
+      const canvas = qrBox.querySelector("canvas");
+      if (!canvas) return;
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = "qrcode.png";
+      link.click();
+    }
+  </script>
+</body>
+</html>
