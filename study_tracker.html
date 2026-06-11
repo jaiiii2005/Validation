@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Study Tracker</title>
+
+  <!-- ===== STYLE (CSS): how the page looks ===== -->
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --good: #22c55e;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+    .app { width: 100%; max-width: 520px; }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #0b1220;
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+    button {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #04283b;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+
+    .stat-row { display: flex; justify-content: space-between; padding: 6px 0; }
+    .stat-row span:last-child { font-weight: 700; }
+    .goal-msg { margin-top: 10px; font-weight: 700; }
+    .goal-hit { color: var(--good); }
+    .goal-left { color: var(--accent); }
+
+    ul { list-style: none; padding: 0; margin: 0; }
+    li {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #334155;
+      font-size: 0.95rem;
+    }
+    li:last-child { border-bottom: none; }
+    li .date { color: var(--muted); font-size: 0.8rem; }
+    .empty { color: var(--muted); }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1>Study Tracker</h1>
+    <p class="sub">Log your study sessions and hit your daily goal.</p>
+
+    <!-- ===== Log a session ===== -->
+    <div class="card">
+      <label for="topic">What did you study?</label>
+      <input id="topic" type="text" placeholder="e.g. Prompt engineering" />
+
+      <label for="hours">How many hours?</label>
+      <input id="hours" type="number" min="0" step="0.5" placeholder="e.g. 1.5" />
+
+      <button onclick="logSession()">Log session</button>
+    </div>
+
+    <!-- ===== Summary (filled in by JavaScript) ===== -->
+    <div class="card">
+      <div class="stat-row"><span>Total sessions</span><span id="totalSessions">0</span></div>
+      <div class="stat-row"><span>Total hours</span><span id="totalHours">0</span></div>
+      <div class="stat-row"><span>Today</span><span id="todayHours">0h / 4h goal</span></div>
+      <div id="goalMsg" class="goal-msg"></div>
+    </div>
+
+    <!-- ===== Session history ===== -->
+    <div class="card">
+      <ul id="sessionList"><li class="empty">No sessions yet. Go study something!</li></ul>
+    </div>
+  </div>
+
+  <!-- ===== SCRIPT (JavaScript): how the page behaves ===== -->
+  <script>
+    const DAILY_GOAL = 4; // target hours per day
+
+    // Load saved sessions from the browser's localStorage (the web's version
+    // of our Python JSON file). Returns [] the first time.
+    function loadSessions() {
+      return JSON.parse(localStorage.getItem("studySessions") || "[]");
+    }
+
+    // Save all sessions back to localStorage.
+    function saveSessions(sessions) {
+      localStorage.setItem("studySessions", JSON.stringify(sessions));
+    }
+
+    function today() {
+      return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    }
+
+    // Called when the "Log session" button is clicked.
+    function logSession() {
+      const topic = document.getElementById("topic").value.trim();
+      const hours = parseFloat(document.getElementById("hours").value);
+
+      if (!topic || isNaN(hours) || hours <= 0) {
+        alert("Please enter a topic and a number of hours.");
+        return;
+      }
+
+      const sessions = loadSessions();
+      sessions.push({ date: today(), topic, hours });
+      saveSessions(sessions);
+
+      // Clear the inputs and refresh the screen.
+      document.getElementById("topic").value = "";
+      document.getElementById("hours").value = "";
+      render();
+    }
+
+    // Redraw the summary and the history list from saved data.
+    function render() {
+      const sessions = loadSessions();
+
+      const total = sessions.reduce((sum, s) => sum + s.hours, 0);
+      const todayHours = sessions
+        .filter((s) => s.date === today())
+        .reduce((sum, s) => sum + s.hours, 0);
+
+      document.getElementById("totalSessions").textContent = sessions.length;
+      document.getElementById("totalHours").textContent = total + "h";
+      document.getElementById("todayHours").textContent =
+        todayHours + "h / " + DAILY_GOAL + "h goal";
+
+      const msg = document.getElementById("goalMsg");
+      if (todayHours >= DAILY_GOAL) {
+        msg.textContent = "Daily goal hit! Nice work.";
+        msg.className = "goal-msg goal-hit";
+      } else {
+        msg.textContent = (DAILY_GOAL - todayHours) + "h left to hit today's goal.";
+        msg.className = "goal-msg goal-left";
+      }
+
+      // Newest first.
+      const list = document.getElementById("sessionList");
+      if (sessions.length === 0) {
+        list.innerHTML = '<li class="empty">No sessions yet. Go study something!</li>';
+        return;
+      }
+      list.innerHTML = sessions
+        .slice()
+        .reverse()
+        .map(
+          (s) =>
+            `<li><span>${s.topic} <span class="date">(${s.date})</span></span><span>${s.hours}h</span></li>`
+        )
+        .join("");
+    }
+
+    // Draw the page once when it first loads.
+    render();
+  </script>
+</body>
+</html>
