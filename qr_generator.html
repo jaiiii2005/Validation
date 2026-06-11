@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QR Code Generator</title>
 
-  <!-- A free QR-code library, loaded from a CDN (someone else's code we reuse). -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -44,18 +41,19 @@
       margin-bottom: 18px;
     }
 
-    /* The white box that holds the QR image (white so it scans well). */
-    #qr {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
+    /* White box that holds the QR image (white so it scans well). */
+    .qrbox {
       background: #fff;
       padding: 14px;
       border-radius: 12px;
-      min-height: 60px;
       margin-bottom: 18px;
+      min-height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    #qr:empty::after { content: "Your QR code will appear here"; color: #94a3b8; font-size: 0.85rem; padding: 20px; }
+    #qrImg { width: 240px; height: 240px; display: none; }
+    .hint { color: #94a3b8; font-size: 0.85rem; padding: 30px 10px; }
 
     button {
       width: 100%;
@@ -81,39 +79,57 @@
     <label for="text">Link or text</label>
     <input id="text" type="text" placeholder="https://your-website.com" oninput="generate()" />
 
-    <div id="qr"></div>
+    <div class="qrbox">
+      <span class="hint" id="hint">Your QR code will appear here</span>
+      <img id="qrImg" alt="QR code" />
+    </div>
 
     <button id="download" onclick="downloadPNG()" disabled>Download PNG</button>
   </div>
 
   <script>
-    const qrBox = document.getElementById("qr");
+    // A free QR web service: we send it text, it returns a QR image.
+    const API = "https://api.qrserver.com/v1/create-qr-code/";
+
+    const input = document.getElementById("text");
+    const img = document.getElementById("qrImg");
+    const hint = document.getElementById("hint");
     const downloadBtn = document.getElementById("download");
+    let currentUrl = "";
 
-    // Create one QR object tied to the white box. We reuse it for every update.
-    const qrcode = new QRCode(qrBox, { width: 240, height: 240 });
-
-    // Called on every keystroke: redraw the QR for whatever is typed.
+    // Called on every keystroke: build the image URL for whatever was typed.
     function generate() {
-      const text = document.getElementById("text").value.trim();
+      const text = input.value.trim();
       if (!text) {
-        qrcode.clear();          // library method: wipe the current code
-        qrBox.innerHTML = "";    // also clear leftover canvas/img so the hint shows
+        img.style.display = "none";
+        hint.style.display = "block";
         downloadBtn.disabled = true;
+        currentUrl = "";
         return;
       }
-      qrcode.makeCode(text);     // library method: draw a QR for this text
+      // encodeURIComponent makes the text safe to put inside a URL.
+      currentUrl = API + "?size=300x300&data=" + encodeURIComponent(text);
+      img.src = currentUrl;
+      img.style.display = "block";
+      hint.style.display = "none";
       downloadBtn.disabled = false;
     }
 
-    // Save the QR as a PNG image file.
-    function downloadPNG() {
-      const canvas = qrBox.querySelector("canvas");
-      if (!canvas) return;
-      const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
-      link.download = "qrcode.png";
-      link.click();
+    // Save the QR as a PNG file.
+    async function downloadPNG() {
+      if (!currentUrl) return;
+      try {
+        const response = await fetch(currentUrl);
+        const blob = await response.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "qrcode.png";
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } catch (e) {
+        // If the download is blocked, just open the image so the user can save it.
+        window.open(currentUrl, "_blank");
+      }
     }
   </script>
 </body>
