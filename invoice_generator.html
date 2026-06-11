@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice Generator</title>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 24px;
+    }
+    .sheet {
+      background: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 { font-size: 2rem; color: #2563eb; letter-spacing: 1px; }
+    .row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .col { flex: 1; min-width: 220px; }
+    .block { margin-top: 24px; }
+    label { display: block; font-size: 0.75rem; text-transform: uppercase; color: #64748b; margin: 10px 0 3px; letter-spacing: 0.5px; }
+    input, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+    textarea { resize: vertical; min-height: 56px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th { text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; padding: 8px; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 6px 8px; border-bottom: 1px solid #eef2f7; }
+    td input { border: 1px solid transparent; }
+    td input:focus { border: 1px solid #cbd5e1; }
+    .amount { text-align: right; font-variant-numeric: tabular-nums; }
+    .right { text-align: right; }
+
+    .totals { margin-top: 16px; margin-left: auto; width: 280px; }
+    .totals .line { display: flex; justify-content: space-between; padding: 6px 0; }
+    .totals .grand { border-top: 2px solid #e2e8f0; margin-top: 6px; padding-top: 10px; font-size: 1.25rem; font-weight: 700; color: #2563eb; }
+
+    button {
+      border: none;
+      border-radius: 7px;
+      padding: 9px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-add { background: #e0e7ff; color: #3730a3; margin-top: 12px; }
+    .btn-del { background: #fee2e2; color: #b91c1c; padding: 4px 10px; }
+    .toolbar { max-width: 800px; margin: 0 auto 16px; display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-print { background: #2563eb; color: #fff; }
+
+    /* When printing, hide the buttons and the page background */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { box-shadow: none; max-width: 100%; }
+      .toolbar, .btn-add, .btn-del { display: none !important; }
+      td input { border: none; }
+      th:last-child, td:last-child { display: none; } /* hide the delete column */
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Buttons (hidden when printing) -->
+  <div class="toolbar">
+    <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="sheet">
+    <div class="row">
+      <div class="col">
+        <h1>INVOICE</h1>
+        <label>From (your business)</label>
+        <textarea id="from" placeholder="Your Name / Business&#10;Address&#10;Phone &middot; Email"></textarea>
+      </div>
+      <div class="col">
+        <label>Bill to (client)</label>
+        <textarea id="to" placeholder="Client Name&#10;Address"></textarea>
+        <div class="row">
+          <div class="col">
+            <label>Invoice #</label>
+            <input id="invno" value="001" />
+          </div>
+          <div class="col">
+            <label>Date</label>
+            <input id="date" type="date" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:50%">Description</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th class="right">Amount</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="items"></tbody>
+      </table>
+      <button class="btn-add" onclick="addRow()">+ Add item</button>
+    </div>
+
+    <div class="totals">
+      <div class="line"><span>Subtotal</span><span id="subtotal">0.00</span></div>
+      <div class="line">
+        <span>Tax (%) <input id="taxRate" type="number" value="0" style="width:60px; display:inline-block; padding:2px 6px;" oninput="recalc()" /></span>
+        <span id="taxAmt">0.00</span>
+      </div>
+      <div class="line grand"><span>Total</span><span id="grand">0.00</span></div>
+    </div>
+  </div>
+
+  <script>
+    const itemsBody = document.getElementById("items");
+
+    // Add a new line-item row to the table.
+    function addRow(desc = "", qty = 1, rate = 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input class="desc" placeholder="Item or service" value="${desc}"></td>
+        <td><input class="qty" type="number" min="0" value="${qty}" oninput="recalc()"></td>
+        <td><input class="rate" type="number" min="0" step="0.01" value="${rate}" oninput="recalc()"></td>
+        <td class="amount">0.00</td>
+        <td><button class="btn-del" onclick="this.closest('tr').remove(); recalc()">x</button></td>`;
+      itemsBody.appendChild(tr);
+      recalc();
+    }
+
+    // Recalculate every row amount, the subtotal, tax, and grand total.
+    function recalc() {
+      let subtotal = 0;
+      for (const tr of itemsBody.querySelectorAll("tr")) {
+        const qty = parseFloat(tr.querySelector(".qty").value) || 0;
+        const rate = parseFloat(tr.querySelector(".rate").value) || 0;
+        const amount = qty * rate;
+        subtotal += amount;
+        tr.querySelector(".amount").textContent = amount.toFixed(2);
+      }
+      const taxRate = parseFloat(document.getElementById("taxRate").value) || 0;
+      const taxAmt = subtotal * (taxRate / 100);
+
+      document.getElementById("subtotal").textContent = subtotal.toFixed(2);
+      document.getElementById("taxAmt").textContent = taxAmt.toFixed(2);
+      document.getElementById("grand").textContent = (subtotal + taxAmt).toFixed(2);
+    }
+
+    // Start with today's date and two example rows.
+    document.getElementById("date").valueAsDate = new Date();
+    addRow("Design work", 1, 5000);
+    addRow("Consultation (hours)", 2, 1500);
+  </script>
+</body>
+</html>
