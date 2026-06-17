@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>C Programming Tutor</title>
+  <title>Code Tutor</title>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,12 +94,20 @@
 
     <main class="main">
       <header>
-        <h1>C Programming Tutor</h1>
-        <p>Ask any C question — beginner to interview level. It solves code and explains it your way.</p>
+        <h1>Code Tutor</h1>
+        <p>Ask any programming question — beginner to interview level. It solves code and explains it your way.</p>
       </header>
 
       <div class="styleBar">
-        <span>Explain answers:</span>
+        <span>Language:</span>
+        <select id="lang">
+          <option value="C">C</option>
+          <option value="C++">C++</option>
+          <option value="Python">Python</option>
+          <option value="Java">Java</option>
+          <option value="JavaScript">JavaScript</option>
+        </select>
+        <span>Explain:</span>
         <select id="style">
           <option value="detailed">In detail (step by step)</option>
           <option value="examples">With examples</option>
@@ -111,7 +119,7 @@
       <div class="messages" id="messages"></div>
 
       <div class="composer">
-        <textarea id="input" placeholder="Type your C question or paste code... (Enter to send)"></textarea>
+        <textarea id="input" placeholder="Type your coding question or paste code... (Enter to send)"></textarea>
         <button id="send" onclick="send()">Send</button>
       </div>
     </main>
@@ -124,6 +132,7 @@
     const ACTIVE_KEY = "cTutorActiveId";
 
     const styleSel = document.getElementById("style");
+    const langSel = document.getElementById("lang");
     const messagesEl = document.getElementById("messages");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("send");
@@ -195,7 +204,7 @@
       const chat = activeChat();
       if (!chat || chat.messages.length === 0) {
         messagesEl.innerHTML =
-          '<div class="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>';
+          '<div class="empty">Ask me a coding question to begin. Example: "Write a program to reverse a string."</div>';
         return;
       }
       for (const m of chat.messages) {
@@ -275,17 +284,18 @@
     }
 
     function systemText() {
+      const lang = langSel.value;
       const styles = {
         detailed: "Explain your solution thoroughly, step by step, so a beginner can follow.",
         examples: "Include example inputs and outputs and show how the code is used.",
         short: "Keep explanations brief and to the point.",
         code: "Give mainly the code with only minimal explanation.",
       };
-      return "You are an expert C programming tutor. You help with C questions from "
-        + "beginner to advanced interview level. Given a problem, provide correct, "
-        + "well-written C code. Given code, you can fix, explain, or improve it. "
-        + "Always put C code in markdown code blocks. Only answer C / programming "
-        + "questions; if asked something unrelated, gently steer back to C. "
+      return "You are an expert " + lang + " programming tutor. You help with " + lang
+        + " questions from beginner to advanced interview level. Given a problem, provide "
+        + "correct, well-written " + lang + " code. Given code, you can fix, explain, or "
+        + "improve it. Always put code in markdown code blocks. Only answer programming "
+        + "questions; if asked something unrelated, gently steer back to coding. "
         + (styles[styleSel.value] || styles.detailed);
     }
 
