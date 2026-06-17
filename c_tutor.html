@@ -25,13 +25,6 @@
       color: #e2e8f0; font-size: 0.85rem; font-weight: 600; padding: 8px 12px; cursor: pointer;
     }
     .newchat:hover { background: #273449; }
-    .code-wrap { position: relative; }
-    .copy-btn {
-      position: absolute; top: 8px; right: 8px; border: none; border-radius: 6px;
-      background: #334155; color: #e2e8f0; font-size: 0.72rem; font-weight: 600;
-      padding: 4px 9px; cursor: pointer; opacity: 0.85;
-    }
-    .copy-btn:hover { opacity: 1; }
 
     .styleBar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; color: #94a3b8; }
     .styleBar select {
@@ -43,12 +36,19 @@
     .msg { max-width: 88%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; line-height: 1.5; font-size: 0.95rem; }
     .user { background: #1e40af; align-self: flex-end; border-bottom-right-radius: 3px; }
     .bot { background: #1e293b; align-self: flex-start; border-bottom-left-radius: 3px; }
+    .code-wrap { position: relative; }
     .bot pre {
       background: #0b1220; border: 1px solid #273449; border-radius: 8px;
       padding: 10px 12px; margin: 8px 0; overflow-x: auto;
       font-family: Consolas, Menlo, monospace; font-size: 0.85rem; white-space: pre;
     }
     .bot code { background: #0b1220; padding: 1px 5px; border-radius: 4px; font-family: Consolas, Menlo, monospace; font-size: 0.85rem; }
+    .copy-btn {
+      position: absolute; top: 8px; right: 8px; border: none; border-radius: 6px;
+      background: #334155; color: #e2e8f0; font-size: 0.72rem; font-weight: 600;
+      padding: 4px 9px; cursor: pointer; opacity: 0.85;
+    }
+    .copy-btn:hover { opacity: 1; }
     .empty { color: #64748b; text-align: center; margin: auto; font-size: 0.9rem; }
 
     .composer { display: flex; gap: 8px; padding-top: 10px; }
@@ -99,6 +99,7 @@
     // Our backend (a Cloudflare Worker) holds the API key secretly and talks to
     // Gemini for us. The key is NEVER in this page — safe to share with anyone.
     const WORKER_URL = "https://c-tutor.jkadvertising.workers.dev";
+    const STORAGE_KEY = "cTutorHistory";
 
     const styleSel = document.getElementById("style");
     const messagesEl = document.getElementById("messages");
@@ -124,12 +125,37 @@
         + (styles[styleSel.value] || styles.detailed);
     }
 
+    function escapeHtml(t) {
+      return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Lightweight markdown — split on code fences so code is never altered.
+    // Even chunks are normal text; odd chunks are inside ``` ``` code blocks.
+    function format(text) {
+      const parts = text.split(/```[a-zA-Z]*\n?/);
+      let html = "";
+      parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+          html += "<pre>" + escapeHtml(part.replace(/\n$/, "")) + "</pre>";
+        } else {
+          let t = escapeHtml(part);
+          t = t.replace(/`([^`]+)`/g, "<code>$1</code>");     // inline code
+          t = t.replace(/^#{1,6}\s*(.+)$/gm, "<strong>$1</strong>"); // headings
+          t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");  // **bold**
+          t = t.replace(/^\s*[\*\-]\s+/gm, "• ");             // bullets
+          html += t;
+        }
+      });
+      return html;
+    }
+
     function addMessage(role, text) {
       document.getElementById("empty")?.remove();
       const div = document.createElement("div");
       div.className = "msg " + (role === "user" ? "user" : "bot");
       div.innerHTML = role === "user" ? escapeHtml(text) : format(text);
       messagesEl.appendChild(div);
+      if (role !== "user") addCopyButtons(div);
       messagesEl.scrollTop = messagesEl.scrollHeight;
       return div;
     }
@@ -154,13 +180,6 @@
       });
     }
 
-    // Start a fresh conversation.
-    function newChat() {
-      history.length = 0;
-      messagesEl.innerHTML =
-        '<div class="empty" id="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>';
-    }
-
     // Copy text to the clipboard, with a fallback for non-secure contexts.
     async function copyText(text) {
       try {
@@ -180,30 +199,29 @@
       document.body.removeChild(ta);
     }
 
-    function escapeHtml(t) {
-      return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // ---- Saving the conversation so it survives a page refresh ----
+    function saveHistory() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     }
 
-    // Lightweight markdown: code blocks, inline code, headers, bold, bullets.
-    function format(text) {
-      const blocks = [];
-      // Pull out code blocks first so markdown inside them isn't altered.
-      let html = text.replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, (m, c) => {
-        blocks.push(c.replace(/\n$/, ""));
-        return " B" + (blocks.length - 1) + " ";
-      });
-      const inlines = [];
-      html = html.replace(/`([^`]+)`/g, (m, c) => {
-        inlines.push(c);
-        return " I" + (inlines.length - 1) + " ";
-      });
-      html = escapeHtml(html);
-      html = html.replace(/^#{1,6}\s*(.+)$/gm, "<strong>$1</strong>"); // headings
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");  // **bold**
-      html = html.replace(/^\s*[\*\-]\s+/gm, "• ");                    // bullets
-      html = html.replace(/ I(\d+) /g, (m, i) => "<code>" + escapeHtml(inlines[i]) + "</code>");
-      html = html.replace(/ B(\d+) /g, (m, i) => "<pre>" + escapeHtml(blocks[i]) + "</pre>");
-      return html;
+    function restoreHistory() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const items = JSON.parse(saved);
+        for (const item of items) {
+          history.push(item);
+          const text = item.parts.map((p) => p.text).join("");
+          addMessage(item.role === "user" ? "user" : "bot", text);
+        }
+      } catch (e) { /* ignore corrupt saved data */ }
+    }
+
+    function newChat() {
+      history.length = 0;
+      localStorage.removeItem(STORAGE_KEY);
+      messagesEl.innerHTML =
+        '<div class="empty" id="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>';
     }
 
     // Send the conversation to our backend, which forwards it to Gemini.
@@ -213,6 +231,7 @@
 
       addMessage("user", text);
       history.push({ role: "user", parts: [{ text }] });
+      saveHistory();
       inputEl.value = "";
       sendBtn.disabled = true;
 
@@ -237,7 +256,7 @@
           const data = await res.json();
           if (res.ok) {
             reply = (data.candidates && data.candidates[0]
-              && data.candidates[0].content.parts.map(p => p.text).join("")) || "(no response)";
+              && data.candidates[0].content.parts.map((p) => p.text).join("")) || "(no response)";
             break;
           }
           lastError = data.error ? data.error.message : "HTTP " + res.status;
@@ -254,9 +273,11 @@
         thinking.innerHTML = format(reply);
         addCopyButtons(thinking);
         history.push({ role: "model", parts: [{ text: reply }] });
+        saveHistory();
       } else {
         thinking.innerHTML = "⚠️ Error: " + escapeHtml(lastError);
         history.pop();
+        saveHistory();
       }
       sendBtn.disabled = false;
       messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -266,6 +287,8 @@
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
+
+    restoreHistory(); // load any saved conversation when the page opens
   </script>
 </body>
 </html>
