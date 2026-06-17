@@ -15,16 +15,34 @@
       display: flex;
       justify-content: center;
     }
-    .app { width: 100%; max-width: 760px; height: 100vh; display: flex; flex-direction: column; padding: 16px; }
+    .app { width: 100%; max-width: 1000px; height: 100vh; display: flex; }
 
-    header { padding: 6px 4px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    header h1 { font-size: 1.25rem; }
-    header p { color: #94a3b8; font-size: 0.85rem; }
+    /* ---- Sidebar: list of saved chats ---- */
+    .sidebar {
+      width: 230px; flex-shrink: 0; background: #0b1220; border-right: 1px solid #1e293b;
+      display: flex; flex-direction: column; padding: 12px; gap: 10px;
+    }
     .newchat {
-      flex-shrink: 0; border: 1px solid #334155; border-radius: 8px; background: #1e293b;
-      color: #e2e8f0; font-size: 0.85rem; font-weight: 600; padding: 8px 12px; cursor: pointer;
+      border: 1px solid #334155; border-radius: 8px; background: #1e293b;
+      color: #e2e8f0; font-size: 0.9rem; font-weight: 600; padding: 10px; cursor: pointer;
     }
     .newchat:hover { background: #273449; }
+    .chat-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .chat-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #cbd5e1;
+    }
+    .chat-item:hover { background: #1e293b; }
+    .chat-item.active { background: #1e293b; color: #fff; }
+    .chat-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-del { border: none; background: transparent; color: #64748b; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px 0 6px; }
+    .chat-del:hover { color: #f87171; }
+
+    /* ---- Main chat area ---- */
+    .main { flex: 1; display: flex; flex-direction: column; padding: 16px; min-width: 0; }
+    header { padding: 6px 4px 12px; }
+    header h1 { font-size: 1.25rem; }
+    header p { color: #94a3b8; font-size: 0.85rem; }
 
     .styleBar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; color: #94a3b8; }
     .styleBar select {
@@ -62,67 +80,127 @@
       font-weight: 700; padding: 0 20px; cursor: pointer; font-size: 0.95rem;
     }
     .composer button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    @media (max-width: 640px) { .sidebar { width: 140px; padding: 8px; } }
   </style>
 </head>
 
 <body>
   <div class="app">
-    <header>
-      <div>
+    <aside class="sidebar">
+      <button class="newchat" onclick="newChat()">+ New chat</button>
+      <div class="chat-list" id="chatList"></div>
+    </aside>
+
+    <main class="main">
+      <header>
         <h1>C Programming Tutor</h1>
         <p>Ask any C question — beginner to interview level. It solves code and explains it your way.</p>
+      </header>
+
+      <div class="styleBar">
+        <span>Explain answers:</span>
+        <select id="style">
+          <option value="detailed">In detail (step by step)</option>
+          <option value="examples">With examples</option>
+          <option value="short">Short &amp; to the point</option>
+          <option value="code">Mostly just the code</option>
+        </select>
       </div>
-      <button class="newchat" onclick="newChat()">+ New chat</button>
-    </header>
 
-    <div class="styleBar">
-      <span>Explain answers:</span>
-      <select id="style">
-        <option value="detailed">In detail (step by step)</option>
-        <option value="examples">With examples</option>
-        <option value="short">Short &amp; to the point</option>
-        <option value="code">Mostly just the code</option>
-      </select>
-    </div>
+      <div class="messages" id="messages"></div>
 
-    <div class="messages" id="messages">
-      <div class="empty" id="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>
-    </div>
-
-    <div class="composer">
-      <textarea id="input" placeholder="Type your C question or paste code... (Enter to send)"></textarea>
-      <button id="send" onclick="send()">Send</button>
-    </div>
+      <div class="composer">
+        <textarea id="input" placeholder="Type your C question or paste code... (Enter to send)"></textarea>
+        <button id="send" onclick="send()">Send</button>
+      </div>
+    </main>
   </div>
 
   <script>
-    // Our backend (a Cloudflare Worker) holds the API key secretly and talks to
-    // Gemini for us. The key is NEVER in this page — safe to share with anyone.
+    // Backend (Cloudflare Worker) holds the API key secretly. None in this page.
     const WORKER_URL = "https://c-tutor.jkadvertising.workers.dev";
-    const STORAGE_KEY = "cTutorHistory";
+    const CHATS_KEY = "cTutorChats";
+    const ACTIVE_KEY = "cTutorActiveId";
 
     const styleSel = document.getElementById("style");
     const messagesEl = document.getElementById("messages");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("send");
+    const chatList = document.getElementById("chatList");
 
-    // The whole conversation, so follow-up questions have context.
-    const history = [];
+    // All chats live here. Each chat: { id, title, messages: [...] }.
+    let chats = [];
+    let activeId = null;
 
-    // Build the tutor's instructions based on the chosen style.
-    function systemText() {
-      const styles = {
-        detailed: "Explain your solution thoroughly, step by step, so a beginner can follow.",
-        examples: "Include example inputs and outputs and show how the code is used.",
-        short: "Keep explanations brief and to the point.",
-        code: "Give mainly the code with only minimal explanation.",
-      };
-      return "You are an expert C programming tutor. You help with C questions from "
-        + "beginner to advanced interview level. Given a problem, provide correct, "
-        + "well-written C code. Given code, you can fix, explain, or improve it. "
-        + "Always put C code in markdown code blocks. Only answer C / programming "
-        + "questions; if asked something unrelated, gently steer back to C. "
-        + (styles[styleSel.value] || styles.detailed);
+    // ---- Storage ----
+    function loadChats() {
+      try { chats = JSON.parse(localStorage.getItem(CHATS_KEY)) || []; }
+      catch (e) { chats = []; }
+      activeId = localStorage.getItem(ACTIVE_KEY);
+    }
+    function saveChats() {
+      localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+      localStorage.setItem(ACTIVE_KEY, activeId || "");
+    }
+    function activeChat() { return chats.find((c) => c.id === activeId); }
+
+    // ---- Chat management ----
+    function newChat() {
+      const chat = { id: String(Date.now()), title: "New chat", messages: [] };
+      chats.unshift(chat); // newest at the top
+      activeId = chat.id;
+      saveChats();
+      renderSidebar();
+      renderMessages();
+      inputEl.focus();
+    }
+    function switchChat(id) {
+      activeId = id;
+      saveChats();
+      renderSidebar();
+      renderMessages();
+    }
+    function deleteChat(id) {
+      chats = chats.filter((c) => c.id !== id);
+      if (!chats.length) { activeId = null; newChat(); return; }
+      if (activeId === id) activeId = chats[0].id;
+      saveChats();
+      renderSidebar();
+      renderMessages();
+    }
+
+    // ---- Rendering ----
+    function renderSidebar() {
+      chatList.innerHTML = "";
+      chats.forEach((chat) => {
+        const item = document.createElement("div");
+        item.className = "chat-item" + (chat.id === activeId ? " active" : "");
+        const title = document.createElement("span");
+        title.className = "chat-title";
+        title.textContent = chat.title || "New chat";
+        title.onclick = () => switchChat(chat.id);
+        const del = document.createElement("button");
+        del.className = "chat-del";
+        del.textContent = "×";
+        del.title = "Delete chat";
+        del.onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
+        item.appendChild(title);
+        item.appendChild(del);
+        chatList.appendChild(item);
+      });
+    }
+    function renderMessages() {
+      messagesEl.innerHTML = "";
+      const chat = activeChat();
+      if (!chat || chat.messages.length === 0) {
+        messagesEl.innerHTML =
+          '<div class="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>';
+        return;
+      }
+      for (const m of chat.messages) {
+        addMessage(m.role === "user" ? "user" : "bot", m.parts.map((p) => p.text).join(""));
+      }
     }
 
     function escapeHtml(t) {
@@ -130,7 +208,6 @@
     }
 
     // Lightweight markdown — split on code fences so code is never altered.
-    // Even chunks are normal text; odd chunks are inside ``` ``` code blocks.
     function format(text) {
       const parts = text.split(/```[a-zA-Z]*\n?/);
       let html = "";
@@ -139,10 +216,10 @@
           html += "<pre>" + escapeHtml(part.replace(/\n$/, "")) + "</pre>";
         } else {
           let t = escapeHtml(part);
-          t = t.replace(/`([^`]+)`/g, "<code>$1</code>");     // inline code
-          t = t.replace(/^#{1,6}\s*(.+)$/gm, "<strong>$1</strong>"); // headings
-          t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");  // **bold**
-          t = t.replace(/^\s*[\*\-]\s+/gm, "• ");             // bullets
+          t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+          t = t.replace(/^#{1,6}\s*(.+)$/gm, "<strong>$1</strong>");
+          t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+          t = t.replace(/^\s*[\*\-]\s+/gm, "• ");
           html += t;
         }
       });
@@ -150,7 +227,7 @@
     }
 
     function addMessage(role, text) {
-      document.getElementById("empty")?.remove();
+      messagesEl.querySelector(".empty")?.remove();
       const div = document.createElement("div");
       div.className = "msg " + (role === "user" ? "user" : "bot");
       div.innerHTML = role === "user" ? escapeHtml(text) : format(text);
@@ -160,7 +237,6 @@
       return div;
     }
 
-    // Add a "Copy" button to each code block in a rendered message.
     function addCopyButtons(container) {
       container.querySelectorAll("pre").forEach((pre) => {
         const wrap = document.createElement("div");
@@ -180,14 +256,13 @@
       });
     }
 
-    // Copy text to the clipboard, with a fallback for non-secure contexts.
     async function copyText(text) {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
           return;
         }
-      } catch (e) { /* fall through to the fallback below */ }
+      } catch (e) { /* fall through */ }
       const ta = document.createElement("textarea");
       ta.value = text;
       ta.style.position = "fixed";
@@ -199,53 +274,47 @@
       document.body.removeChild(ta);
     }
 
-    // ---- Saving the conversation so it survives a page refresh ----
-    function saveHistory() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    function systemText() {
+      const styles = {
+        detailed: "Explain your solution thoroughly, step by step, so a beginner can follow.",
+        examples: "Include example inputs and outputs and show how the code is used.",
+        short: "Keep explanations brief and to the point.",
+        code: "Give mainly the code with only minimal explanation.",
+      };
+      return "You are an expert C programming tutor. You help with C questions from "
+        + "beginner to advanced interview level. Given a problem, provide correct, "
+        + "well-written C code. Given code, you can fix, explain, or improve it. "
+        + "Always put C code in markdown code blocks. Only answer C / programming "
+        + "questions; if asked something unrelated, gently steer back to C. "
+        + (styles[styleSel.value] || styles.detailed);
     }
 
-    function restoreHistory() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      try {
-        const items = JSON.parse(saved);
-        for (const item of items) {
-          history.push(item);
-          const text = item.parts.map((p) => p.text).join("");
-          addMessage(item.role === "user" ? "user" : "bot", text);
-        }
-      } catch (e) { /* ignore corrupt saved data */ }
-    }
-
-    function newChat() {
-      history.length = 0;
-      localStorage.removeItem(STORAGE_KEY);
-      messagesEl.innerHTML =
-        '<div class="empty" id="empty">Ask me a C question to begin. Example: "Write a program to reverse a string."</div>';
-    }
-
-    // Send the conversation to our backend, which forwards it to Gemini.
     async function send() {
       const text = inputEl.value.trim();
       if (!text) return;
+      const chat = activeChat();
+      if (!chat) return;
 
       addMessage("user", text);
-      history.push({ role: "user", parts: [{ text }] });
-      saveHistory();
+      chat.messages.push({ role: "user", parts: [{ text }] });
+      if (chat.title === "New chat") {
+        chat.title = text.length > 30 ? text.slice(0, 30) + "…" : text;
+        renderSidebar();
+      }
+      saveChats();
       inputEl.value = "";
       sendBtn.disabled = true;
 
       const thinking = addMessage("bot", "Thinking...");
       const payload = {
         systemInstruction: { parts: [{ text: systemText() }] },
-        contents: history,
+        contents: chat.messages,
         generationConfig: { temperature: 0.3 },
       };
 
       let reply = null;
       let lastError = "unknown error";
 
-      // Try up to 3 times — the free model is sometimes briefly "overloaded".
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           const res = await fetch(WORKER_URL, {
@@ -272,23 +341,32 @@
       if (reply !== null) {
         thinking.innerHTML = format(reply);
         addCopyButtons(thinking);
-        history.push({ role: "model", parts: [{ text: reply }] });
-        saveHistory();
+        chat.messages.push({ role: "model", parts: [{ text: reply }] });
       } else {
         thinking.innerHTML = "⚠️ Error: " + escapeHtml(lastError);
-        history.pop();
-        saveHistory();
+        chat.messages.pop();
       }
+      saveChats();
       sendBtn.disabled = false;
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    // Enter to send, Shift+Enter for a new line.
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
 
-    restoreHistory(); // load any saved conversation when the page opens
+    // ---- Startup ----
+    loadChats();
+    if (chats.length && activeChat()) {
+      renderSidebar();
+      renderMessages();
+    } else if (chats.length) {
+      activeId = chats[0].id;
+      renderSidebar();
+      renderMessages();
+    } else {
+      newChat();
+    }
   </script>
 </body>
 </html>
