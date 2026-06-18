@@ -74,6 +74,19 @@ export class Auction implements OnInit {
     return this.svc.poolSize() - Object.keys(drawn).length;
   });
 
+  /** Most expensive players sold so far (top 6), across all teams. */
+  readonly topSigned = computed(() => {
+    const r = this.room();
+    if (!r) return [];
+    const all: { name: string; club: string; price: number; team: string }[] = [];
+    for (const t of Object.values(r.teams ?? {})) {
+      for (const e of Object.values(r.squads?.[t.id] ?? {})) {
+        all.push({ name: e.name, club: e.club, price: e.price, team: t.name });
+      }
+    }
+    return all.sort((a, b) => b.price - a.price).slice(0, 6);
+  });
+
   ngOnInit() {
     const saved = this.readStore();
     if (saved) this.svc.rejoin(saved.code, saved.teamId);

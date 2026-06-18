@@ -160,6 +160,22 @@
             <p class="muted small">{{ remainingCount() }} players left in the pool</p>
           </div>
         }
+
+        @if (topSigned().length) {
+          <div class="toppanel">
+            <h3>💸 Top signings</h3>
+            @for (s of topSigned(); track $index; let i = $index) {
+              <div class="toprow" [class.record]="i === 0">
+                <span class="rank">{{ i === 0 ? '🏆' : i + 1 }}</span>
+                <span class="topname">
+                  {{ s.name }}
+                  <em class="muted">→ {{ s.team }}</em>
+                </span>
+                <span class="topprice">{{ s.price }}m</span>
+              </div>
+            }
+          </div>
+        }
       </div>
 
       <!-- Teams + squads -->
@@ -197,6 +213,20 @@
     <!-- ───────── Done ───────── -->
     <div class="done">
       <h2>🏆 Auction complete</h2>
+
+      @if (topSigned().length) {
+        <div class="toppanel">
+          <h3>💸 Top signings of the auction</h3>
+          @for (s of topSigned(); track $index; let i = $index) {
+            <div class="toprow" [class.record]="i === 0">
+              <span class="rank">{{ i === 0 ? '🏆' : i + 1 }}</span>
+              <span class="topname">{{ s.name }} <em class="muted">→ {{ s.team }}</em></span>
+              <span class="topprice">{{ s.price }}m</span>
+            </div>
+          }
+        </div>
+      }
+
       <div class="final">
         @for (t of teams(); track t.id) {
           <div class="card">

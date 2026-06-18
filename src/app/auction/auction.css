@@ -289,6 +289,50 @@ button.ghost {
   color: #2a1f00;
 }
 
+/* Top signings leaderboard */
+.toppanel {
+  margin-top: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.toppanel h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+.toprow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.toprow + .toprow {
+  border-top: 1px solid var(--line);
+}
+.toprow.record {
+  background: linear-gradient(90deg, rgba(241, 196, 15, 0.18), transparent);
+  border: 1px solid var(--accent2);
+}
+.rank {
+  width: 24px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--muted);
+}
+.toprow.record .rank {
+  color: var(--accent2);
+}
+.topname {
+  flex: 1;
+  font-weight: 600;
+}
+.topprice {
+  font-weight: 800;
+  color: var(--accent2);
+}
+
 /* Teams panel */
 .teams-panel details {
   background: var(--card);
