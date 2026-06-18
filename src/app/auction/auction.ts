@@ -142,6 +142,12 @@ export class Auction implements OnInit {
     if (r) this.svc.skip(r.code);
   }
 
+  pass() {
+    const r = this.room();
+    const id = this.myTeamId();
+    if (r && id) this.svc.pass(r.code, id);
+  }
+
   // ── Helpers used by the template ────────────────────────────────────
 
   squadOf(teamId: string) {
@@ -159,6 +165,22 @@ export class Auction implements OnInit {
 
   amLeading() {
     return this.room()?.current.leaderId === this.myTeamId();
+  }
+
+  iPassed() {
+    const r = this.room();
+    const id = this.myTeamId();
+    return !!(r && id && this.svc.hasPassed(r, id));
+  }
+
+  teamPassed(teamId: string) {
+    const r = this.room();
+    return !!(r && this.svc.hasPassed(r, teamId));
+  }
+
+  activeCount() {
+    const r = this.room();
+    return r ? this.svc.activeCount(r) : 0;
   }
 
   private persist(code: string) {

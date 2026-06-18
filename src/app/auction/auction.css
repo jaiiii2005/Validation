@@ -256,6 +256,25 @@ button.ghost {
   background: #233a5e;
   color: var(--txt);
 }
+.pass {
+  background: #4a2b2b;
+  color: #ffd9d9;
+  border: 1px solid #6b3a3a;
+}
+.passed-note {
+  margin-top: 12px;
+  text-align: center;
+  background: #2a1f1f;
+  border: 1px solid #6b3a3a;
+  color: #ffb3b3;
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 600;
+}
+.tag.passed {
+  background: #6b3a3a;
+  color: #ffd9d9;
+}
 .hostctl {
   display: grid;
   grid-template-columns: 2fr 1fr;

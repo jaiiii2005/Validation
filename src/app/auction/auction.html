@@ -118,26 +118,44 @@
             </div>
 
             <div class="bidbtns">
-              <button (click)="bid(room()!.config.minBid)" [disabled]="amLeading()">
+              <button
+                (click)="bid(room()!.config.minBid)"
+                [disabled]="amLeading() || iPassed() || mySlotsLeft() === 0"
+              >
                 +{{ room()!.config.minBid }}
               </button>
-              <button (click)="bid(5)" [disabled]="amLeading()">+5</button>
-              <button (click)="bid(10)" [disabled]="amLeading()">+10</button>
+              <button (click)="bid(5)" [disabled]="amLeading() || iPassed() || mySlotsLeft() === 0">
+                +5
+              </button>
+              <button (click)="bid(10)" [disabled]="amLeading() || iPassed() || mySlotsLeft() === 0">
+                +10
+              </button>
             </div>
+
+            @if (iPassed()) {
+              <p class="passed-note">✋ You passed — you're out on this player.</p>
+            } @else {
+              <button class="pass" (click)="pass()" [disabled]="amLeading() || mySlotsLeft() === 0">
+                Pass on this player
+              </button>
+            }
+
             <p class="muted small">
               Your budget {{ myTeam()?.budget }} · max bid {{ myMaxBid() }} · slots left
               {{ mySlotsLeft() }}
             </p>
+            <p class="muted small">{{ activeCount() }} of {{ teams().length }} teams still in</p>
 
             @if (isHost()) {
               <div class="hostctl">
-                <button class="sell" (click)="sell()">
-                  {{ room()!.current.leaderId ? 'Sold!' : 'No bids — next' }}
+                <button class="sell" (click)="sell()" [disabled]="!room()!.current.leaderId">
+                  Sold to leader
                 </button>
-                <button class="ghost" (click)="skip()">Skip</button>
+                <button class="ghost" (click)="skip()">Force next</button>
               </div>
-            } @else {
-              <p class="muted small">Host decides when to sell.</p>
+              <p class="muted small">
+                Host override — the lot settles itself once everyone else passes.
+              </p>
             }
             <p class="muted small">{{ remainingCount() }} players left in the pool</p>
           </div>
@@ -152,6 +170,9 @@
               <span class="tname">{{ t.name }}</span>
               @if (t.id === myTeamId()) {
                 <span class="tag you">you</span>
+              }
+              @if (teamPassed(t.id)) {
+                <span class="tag passed">passed</span>
               }
               <span class="tbudget">💰 {{ t.budget }}</span>
               <span class="tcount">{{ squadOf(t.id).length }}/{{ room()!.config.squadSize }}</span>

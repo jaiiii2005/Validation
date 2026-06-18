@@ -14,7 +14,7 @@ import { getDb } from '../firebase';
 import { PLAYERS, type Player, type Position } from './players';
 
 export type RoomStatus = 'lobby' | 'live' | 'done';
-export type CurrentStatus = 'idle' | 'bidding' | 'sold' | 'unsold';
+export type CurrentStatus = 'idle' | 'bidding' | 'settling' | 'sold' | 'unsold';
 
 export interface Team {
   id: string;
@@ -36,6 +36,8 @@ export interface CurrentLot {
   leaderId: string | null;
   leaderName: string | null;
   status: CurrentStatus;
+  /** Teams that have bowed out of the current player. */
+  passed?: Record<string, true>;
 }
 
 export interface RoomConfig {
@@ -94,7 +96,14 @@ export class AuctionService {
       },
       drawn: {},
       squads: { [teamId]: {} },
-      current: { playerId: null, bid: 0, leaderId: null, leaderName: null, status: 'idle' },
+      current: {
+        playerId: null,
+        bid: 0,
+        leaderId: null,
+        leaderName: null,
+        status: 'idle',
+        passed: {},
+      },
     };
     await set(this.roomRef(code), { ...room, createdAt: serverTimestamp() });
     this.myTeamId.set(teamId);
@@ -158,7 +167,14 @@ export class AuctionService {
     if (pool.length === 0) {
       await update(this.roomRef(code), {
         status: 'done',
-        current: { playerId: null, bid: 0, leaderId: null, leaderName: null, status: 'idle' },
+        current: {
+          playerId: null,
+          bid: 0,
+          leaderId: null,
+          leaderName: null,
+          status: 'idle',
+          passed: {},
+        },
       });
       return;
     }
@@ -170,6 +186,7 @@ export class AuctionService {
         leaderId: null,
         leaderName: null,
         status: 'bidding',
+        passed: {},
       },
     });
   }
@@ -235,10 +252,79 @@ export class AuctionService {
     await runTransaction(curRef, (cur: CurrentLot | null) => {
       if (!cur || cur.status !== 'bidding' || !cur.playerId) return cur;
       const newBid = (cur.bid ?? 0) + increment;
-      // Leader can't bid against themselves; respect the team's spending cap.
-      if (cur.leaderId === teamId || newBid > maxBid) return cur;
+      // Can't bid if you've passed, can't bid against yourself, and must stay
+      // within your spending cap.
+      if (cur.passed?.[teamId] || cur.leaderId === teamId || newBid > maxBid) return cur;
       return { ...cur, bid: newBid, leaderId: teamId, leaderName: team.name };
     });
+  }
+
+  /**
+   * A team bows out of the current player. When everyone but one team has
+   * passed, that team wins automatically — at the leading bid if there was
+   * one, otherwise at the base (minimum) price. If everyone passes, the
+   * player goes unsold and the next is drawn.
+   */
+  async pass(code: string, teamId: string): Promise<void> {
+    const room = this.room();
+    if (!room) return;
+    const cur = room.current;
+    if (cur.status !== 'bidding' || !cur.playerId) return;
+    if (cur.leaderId === teamId) return; // can't pass while you're winning
+    await update(ref(this.db, `rooms/${code}/current/passed`), { [teamId]: true });
+    await this.resolveIfSettled(code);
+  }
+
+  /** Settle the lot if the passes have left at most one team still bidding. */
+  private async resolveIfSettled(code: string) {
+    const snap = await get(this.roomRef(code));
+    if (!snap.exists()) return;
+    const room = snap.val() as Room;
+    const cur = room.current;
+    if (cur.status !== 'bidding' || !cur.playerId) return;
+
+    const passed = cur.passed ?? {};
+    // A team is still "in" only if it hasn't passed and still has a squad slot.
+    const active = Object.values(room.teams ?? {}).filter(
+      (t) => !passed[t.id] && this.slotsLeft(room, t.id) > 0,
+    );
+    if (active.length > 1) return; // still bidding
+
+    // Atomically claim the right to settle this lot so two near-simultaneous
+    // passes can't both award it (which would double-charge the winner).
+    const token = randomId();
+    const curRef = ref(this.db, `rooms/${code}/current`);
+    const txn = await runTransaction(curRef, (c: (CurrentLot & { settlerId?: string }) | null) => {
+      if (!c || c.status !== 'bidding') return c;
+      return { ...c, status: 'settling', settlerId: token };
+    });
+    const claimed =
+      txn.committed && (txn.snapshot.val() as { settlerId?: string } | null)?.settlerId === token;
+    if (!claimed) return;
+
+    const playerId = cur.playerId;
+    if (active.length === 0) {
+      // Nobody wanted him — unsold, move on.
+      await update(this.roomRef(code), { [`drawn/${playerId}`]: true });
+      await this.drawNext(code);
+      return;
+    }
+
+    const winner = active[0];
+    // Leading bid if there was one, otherwise the base price.
+    const price = cur.leaderId ? cur.bid : room.config.minBid;
+    const player = PLAYERS.find((p) => p.id === playerId)!;
+    await update(this.roomRef(code), {
+      [`drawn/${playerId}`]: true,
+      [`teams/${winner.id}/budget`]: winner.budget - price,
+      [`squads/${winner.id}/${player.id}`]: {
+        name: player.name,
+        club: player.club,
+        position: player.position,
+        price,
+      },
+    });
+    await this.drawNext(code);
   }
 
   // ── Derived helpers ───────────────────────────────────────────────────
@@ -264,6 +350,19 @@ export class AuctionService {
     if (slots <= 0) return 0;
     const reserve = (slots - 1) * room.config.minBid;
     return Math.max(0, team.budget - reserve);
+  }
+
+  /** Whether a team has bowed out of the current player. */
+  hasPassed(room: Room, teamId: string): boolean {
+    return !!room.current.passed?.[teamId];
+  }
+
+  /** How many teams are still bidding on the current player. */
+  activeCount(room: Room): number {
+    const passed = room.current.passed ?? {};
+    return Object.values(room.teams ?? {}).filter(
+      (t) => !passed[t.id] && this.slotsLeft(room, t.id) > 0,
+    ).length;
   }
 
   player(id: string | null): Player | undefined {
