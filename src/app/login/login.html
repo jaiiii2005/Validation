@@ -1,0 +1,43 @@
+<h2>Tempplate Driven Form</h2>
+<form #myForm="ngForm" (ngSubmit)="onSubmit(myForm)">
+
+  <!--Name Field-->
+  <label>Name:</label>
+  <input type="text" name="name"
+  [(ngModel)]="user.name"
+  required
+  maxlength="5"
+  #name="ngModel">
+
+  <div *ngIf="name.invalid && name.touched">
+    <span style="color:red">Name is required</span>
+  </div>
+
+  <div *ngIf="name.touched && name.errors?.['maxlength']">
+    Maximum 5 characters allowed
+  </div>
+
+  <br><br>
+
+  <!--password field-->
+  <label>Password:</label>
+  <input type="password" name="password"
+  [(ngModel)]="user.password"
+  required
+  maxlength="8"
+  #password="ngModel">
+
+  <div *ngIf="password.invalid && password.touched">
+    <span style="color:red">Password is required </span>
+  </div>
+
+  <div *ngIf="password.touched && password.errors?.['maxlength']">
+    Maximum 8 charachters required
+  </div>
+  <br><br>
+
+  <button type="submit" [disabled]="myForm.invalid">
+    Submit
+  </button>
+
+</form>

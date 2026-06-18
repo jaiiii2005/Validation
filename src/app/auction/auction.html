@@ -1,0 +1,203 @@
+<div class="auction">
+  <header class="topbar">
+    <h1>⚽ Football Legends Auction <span class="era">2000–2010</span></h1>
+    @if (room()) {
+      <button class="ghost" (click)="leave()">Leave</button>
+    }
+  </header>
+
+  <!-- Firebase not set up yet -->
+  @if (!configured) {
+    <div class="card warn">
+      <h2>One-time setup needed</h2>
+      <p>
+        This live auction syncs across phones using Firebase. Open
+        <code>src/app/firebase-config.ts</code> and paste your Firebase project values
+        (step-by-step instructions are in that file). Then refresh.
+      </p>
+    </div>
+  } @else if (!room()) {
+    <!-- ───────── Lobby ───────── -->
+    <div class="lobby">
+      <div class="card">
+        <h2>Create a room</h2>
+        <label>Your team name</label>
+        <input [(ngModel)]="createName" placeholder="e.g. Galácticos" maxlength="20" />
+        <div class="grid3">
+          <div>
+            <label>Budget</label>
+            <input type="number" [(ngModel)]="budget" min="50" max="1000" />
+          </div>
+          <div>
+            <label>Squad size</label>
+            <input type="number" [(ngModel)]="squadSize" min="11" max="23" />
+          </div>
+          <div>
+            <label>Min bid</label>
+            <input type="number" [(ngModel)]="minBid" min="1" max="10" />
+          </div>
+        </div>
+        <button (click)="create()" [disabled]="busy()">Create &amp; host</button>
+      </div>
+
+      <div class="card">
+        <h2>Join a room</h2>
+        <label>Room code</label>
+        <input
+          [(ngModel)]="joinCode"
+          placeholder="4-letter code"
+          maxlength="4"
+          style="text-transform: uppercase"
+        />
+        <label>Your team name</label>
+        <input [(ngModel)]="joinName" placeholder="e.g. Catenaccio FC" maxlength="20" />
+        <button (click)="join()" [disabled]="busy()">Join</button>
+      </div>
+    </div>
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+  } @else if (room()!.status === 'lobby') {
+    <!-- ───────── Waiting room ───────── -->
+    <div class="card center">
+      <p class="muted">Room code — share it with your friends</p>
+      <div class="code">{{ room()!.code }}</div>
+      <p class="muted">
+        Budget {{ room()!.config.budget }} · Squad {{ room()!.config.squadSize }} · Min bid
+        {{ room()!.config.minBid }}
+      </p>
+      <h3>Teams ({{ teams().length }})</h3>
+      <ul class="teamlist">
+        @for (t of teams(); track t.id) {
+          <li>
+            {{ t.name }}
+            @if (t.id === room()!.hostId) {
+              <span class="tag">host</span>
+            }
+            @if (t.id === myTeamId()) {
+              <span class="tag you">you</span>
+            }
+          </li>
+        }
+      </ul>
+      @if (isHost()) {
+        <button (click)="start()" [disabled]="teams().length < 2">Start auction</button>
+        @if (teams().length < 2) {
+          <p class="muted">Waiting for at least one more team…</p>
+        }
+      } @else {
+        <p class="muted">Waiting for the host to start…</p>
+      }
+    </div>
+  } @else if (room()!.status === 'live') {
+    <!-- ───────── Live auction ───────── -->
+    <div class="live">
+      <div class="stage">
+        @if (currentPlayer(); as p) {
+          <div class="player-card" [attr.data-pos]="p.position">
+            <div class="pos-badge">{{ p.position }}</div>
+            <div class="pname">{{ p.name }}</div>
+            <div class="pclub">{{ p.club }}</div>
+            <div class="prole">{{ positionLabel[p.position] }}</div>
+            @if (p.note) {
+              <div class="pnote">{{ p.note }}</div>
+            }
+          </div>
+
+          <div class="bidbar">
+            <div class="bid">
+              <span class="muted">Current bid</span>
+              <strong>{{ room()!.current.bid }}</strong>
+              @if (room()!.current.leaderName) {
+                <span class="leader" [class.me]="amLeading()">
+                  {{ amLeading() ? 'You lead' : room()!.current.leaderName }}
+                </span>
+              } @else {
+                <span class="muted">no bids yet</span>
+              }
+            </div>
+
+            <div class="bidbtns">
+              <button (click)="bid(room()!.config.minBid)" [disabled]="amLeading()">
+                +{{ room()!.config.minBid }}
+              </button>
+              <button (click)="bid(5)" [disabled]="amLeading()">+5</button>
+              <button (click)="bid(10)" [disabled]="amLeading()">+10</button>
+            </div>
+            <p class="muted small">
+              Your budget {{ myTeam()?.budget }} · max bid {{ myMaxBid() }} · slots left
+              {{ mySlotsLeft() }}
+            </p>
+
+            @if (isHost()) {
+              <div class="hostctl">
+                <button class="sell" (click)="sell()">
+                  {{ room()!.current.leaderId ? 'Sold!' : 'No bids — next' }}
+                </button>
+                <button class="ghost" (click)="skip()">Skip</button>
+              </div>
+            } @else {
+              <p class="muted small">Host decides when to sell.</p>
+            }
+            <p class="muted small">{{ remainingCount() }} players left in the pool</p>
+          </div>
+        }
+      </div>
+
+      <!-- Teams + squads -->
+      <div class="teams-panel">
+        @for (t of teams(); track t.id) {
+          <details [open]="t.id === myTeamId()">
+            <summary>
+              <span class="tname">{{ t.name }}</span>
+              @if (t.id === myTeamId()) {
+                <span class="tag you">you</span>
+              }
+              <span class="tbudget">💰 {{ t.budget }}</span>
+              <span class="tcount">{{ squadOf(t.id).length }}/{{ room()!.config.squadSize }}</span>
+            </summary>
+            @for (pos of positions; track pos) {
+              @if (squadByPosition(t.id, pos).length) {
+                <div class="squad-pos">
+                  <span class="poslabel">{{ pos }}</span>
+                  <ul>
+                    @for (pl of squadByPosition(t.id, pos); track pl.name) {
+                      <li><span>{{ pl.name }}</span><span class="price">{{ pl.price }}</span></li>
+                    }
+                  </ul>
+                </div>
+              }
+            }
+          </details>
+        }
+      </div>
+    </div>
+  } @else {
+    <!-- ───────── Done ───────── -->
+    <div class="done">
+      <h2>🏆 Auction complete</h2>
+      <div class="final">
+        @for (t of teams(); track t.id) {
+          <div class="card">
+            <h3>{{ t.name }} <span class="muted">spent {{ spent(t.id) }}</span></h3>
+            @for (pos of positions; track pos) {
+              @if (squadByPosition(t.id, pos).length) {
+                <div class="squad-pos">
+                  <span class="poslabel">{{ positionLabel[pos] }}</span>
+                  <ul>
+                    @for (pl of squadByPosition(t.id, pos); track pl.name) {
+                      <li>
+                        <span>{{ pl.name }} <em class="muted">{{ pl.club }}</em></span>
+                        <span class="price">{{ pl.price }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
