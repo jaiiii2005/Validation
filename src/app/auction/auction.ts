@@ -1,13 +1,20 @@
 import { Component, computed, effect, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuctionService } from './auction.service';
+import { AuctionService, type SquadEntry } from './auction.service';
 import { POSITION_LABEL, type Position } from './players';
 import { getPlayerPhoto } from './photos';
 import { isFirebaseConfigured } from '../firebase-config';
 
 const STORE_KEY = 'football-auction';
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'ATT'];
+
+type Formation = '4-3-3' | '4-4-2' | '3-5-2';
+const FORMATIONS: Record<Formation, { DEF: number; MID: number; ATT: number }> = {
+  '4-3-3': { DEF: 4, MID: 3, ATT: 3 },
+  '4-4-2': { DEF: 4, MID: 4, ATT: 2 },
+  '3-5-2': { DEF: 3, MID: 5, ATT: 2 },
+};
 
 @Component({
   selector: 'app-auction',
@@ -94,6 +101,14 @@ export class Auction implements OnInit {
   /** Photo of the player currently up for auction (null → show placeholder). */
   readonly photoUrl = signal<string | null>(null);
 
+  /** name → photo URL (or null) for every player, used by the pitch view. */
+  readonly photoMap = signal<Record<string, string | null>>({});
+  private requested = new Set<string>();
+
+  // Formation for the pitch / lineup view.
+  readonly formationKeys = Object.keys(FORMATIONS) as Formation[];
+  readonly formation = signal<Formation>('4-3-3');
+
   constructor() {
     // Whenever a new player comes up, fetch their photo (with a guard so a
     // slow response for a previous player can't overwrite the current one).
@@ -105,6 +120,21 @@ export class Auction implements OnInit {
         if (this.currentPlayer()?.id === p.id) this.photoUrl.set(url);
       });
     });
+
+    // Prefetch photos for every sold player so the pitch view has faces ready.
+    effect(() => {
+      const r = this.room();
+      if (!r) return;
+      for (const t of Object.values(r.teams ?? {})) {
+        for (const e of Object.values(r.squads?.[t.id] ?? {})) this.ensurePhoto(e.name);
+      }
+    });
+  }
+
+  private ensurePhoto(name: string) {
+    if (this.requested.has(name)) return;
+    this.requested.add(name);
+    getPlayerPhoto(name).then((url) => this.photoMap.update((m) => ({ ...m, [name]: url })));
   }
 
   ngOnInit() {
@@ -218,6 +248,40 @@ export class Auction implements OnInit {
 
   verdict(price: number, value: number) {
     return this.svc.verdict(price, value);
+  }
+
+  setFormation(f: Formation) {
+    this.formation.set(f);
+  }
+
+  /** Pitch rows top→bottom (ATT, MID, DEF, GK); empty slots are null. */
+  pitchRows(teamId: string): (SquadEntry | null)[][] {
+    const f = FORMATIONS[this.formation()];
+    const fill = (pos: Position, n: number): (SquadEntry | null)[] => {
+      const arr: (SquadEntry | null)[] = this.squadByPosition(teamId, pos).slice(0, n);
+      while (arr.length < n) arr.push(null);
+      return arr;
+    };
+    return [fill('ATT', f.ATT), fill('MID', f.MID), fill('DEF', f.DEF), fill('GK', 1)];
+  }
+
+  /** Players not in the starting XI for the chosen formation. */
+  benchOf(teamId: string): SquadEntry[] {
+    const f = FORMATIONS[this.formation()];
+    const counts: Record<Position, number> = { GK: 1, DEF: f.DEF, MID: f.MID, ATT: f.ATT };
+    const bench: SquadEntry[] = [];
+    for (const pos of this.positions) bench.push(...this.squadByPosition(teamId, pos).slice(counts[pos]));
+    return bench;
+  }
+
+  photo(name: string): string | null {
+    return this.photoMap()[name] ?? null;
+  }
+
+  /** Surname (or single name) for compact slot labels. */
+  shortName(name: string): string {
+    const parts = name.trim().split(' ');
+    return parts.length > 1 ? parts[parts.length - 1] : name;
   }
 
   private persist(code: string) {
