@@ -66,6 +66,8 @@ export interface Room {
   squads: Record<string, Record<string, SquadEntry>>;
   current: CurrentLot;
   lastSale?: LastSale;
+  /** Per-team pitch arrangement: chosen formation + player order (starters first). */
+  lineups?: Record<string, { formation: string; order: string[] }>;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no easily-confused chars
@@ -417,5 +419,10 @@ export class AuctionService {
   /** Total number of players in the auction pool. */
   poolSize(): number {
     return PLAYERS.length;
+  }
+
+  /** Save a team's pitch arrangement (formation + ordered player ids). */
+  async saveLineup(code: string, teamId: string, formation: string, order: string[]) {
+    await update(this.roomRef(code), { [`lineups/${teamId}`]: { formation, order } });
   }
 }

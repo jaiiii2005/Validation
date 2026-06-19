@@ -251,33 +251,45 @@
         </div>
       }
 
-      <div class="formationbar">
-        <span class="muted">Formation</span>
-        @for (f of formationKeys; track f) {
-          <button class="fbtn" [class.active]="formation() === f" (click)="setFormation(f)">
-            {{ f }}
-          </button>
-        }
-      </div>
+      <p class="muted small swaphint">
+        Pick a formation per team. Tap a player then another to swap them — works
+        between the pitch and the subs (sub in / sub out).
+      </p>
 
       <div class="final">
         @for (t of teams(); track t.id) {
           <div class="card teamcard">
-            <h3>{{ t.name }} <span class="muted">spent {{ spent(t.id) }} · {{ formation() }}</span></h3>
+            <div class="teamhead">
+              <h3>{{ t.name }} <span class="muted">spent {{ spent(t.id) }}</span></h3>
+              <select
+                class="fselect"
+                [value]="formationFor(t.id)"
+                (change)="changeFormation(t.id, $any($event.target).value)"
+              >
+                @for (f of formationKeys; track f) {
+                  <option [value]="f">{{ f }}</option>
+                }
+              </select>
+            </div>
 
             <div class="pitch">
               @for (row of pitchRows(t.id); track $index) {
                 <div class="prow">
                   @for (slot of row; track $index) {
-                    <div class="slot" [class.empty]="!slot">
+                    <div
+                      class="slot"
+                      [class.empty]="!slot"
+                      [class.sel]="slot && isSelected(t.id, slot.id)"
+                      (click)="tapPlayer(t.id, slot ? slot.id : null)"
+                    >
                       @if (slot) {
-                        @if (photo(slot.name)) {
-                          <img class="slotimg" [src]="photo(slot.name)" [alt]="slot.name" />
+                        @if (photo(slot.entry.name); as ph) {
+                          <img class="slotimg" [src]="ph" [alt]="slot.entry.name" />
                         } @else {
-                          <div class="slotimg ph">{{ slot.position }}</div>
+                          <div class="slotimg ph">{{ slot.entry.position }}</div>
                         }
-                        <div class="slotname">{{ shortName(slot.name) }}</div>
-                        <div class="slotprice">{{ slot.price }}m</div>
+                        <div class="slotname">{{ shortName(slot.entry.name) }}</div>
+                        <div class="slotprice">{{ slot.entry.price }}m</div>
                       }
                     </div>
                   }
@@ -289,14 +301,18 @@
               <div class="bench">
                 <span class="benchlabel">SUBS</span>
                 <div class="benchrow">
-                  @for (b of benchOf(t.id); track b.name) {
-                    <div class="benchitem">
-                      @if (photo(b.name)) {
-                        <img class="benchimg" [src]="photo(b.name)" [alt]="b.name" />
+                  @for (b of benchOf(t.id); track b.id) {
+                    <div
+                      class="benchitem"
+                      [class.sel]="isSelected(t.id, b.id)"
+                      (click)="tapPlayer(t.id, b.id)"
+                    >
+                      @if (photo(b.entry.name); as ph) {
+                        <img class="benchimg" [src]="ph" [alt]="b.entry.name" />
                       } @else {
-                        <div class="benchimg ph">{{ b.position }}</div>
+                        <div class="benchimg ph">{{ b.entry.position }}</div>
                       }
-                      <span class="benchname">{{ shortName(b.name) }}</span>
+                      <span class="benchname">{{ shortName(b.entry.name) }}</span>
                     </div>
                   }
                 </div>

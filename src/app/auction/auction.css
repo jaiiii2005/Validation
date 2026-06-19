@@ -499,31 +499,41 @@ summary {
   gap: 14px;
 }
 
-/* Formation switcher */
-.formationbar {
+/* Pitch / lineup view */
+.swaphint {
+  margin: 12px 0;
+}
+.teamhead {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 14px 0;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
 }
-.fbtn {
-  width: auto;
+.teamhead h3 {
   margin: 0;
-  padding: 7px 14px;
-  background: var(--card);
+}
+.fselect {
+  width: auto;
+  flex-shrink: 0;
+  background: #0e1322;
   color: var(--txt);
   border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
   font-weight: 700;
+  font-size: 0.9rem;
 }
-.fbtn.active {
-  background: var(--accent);
-  color: #05210f;
-  border-color: var(--accent);
+.slot {
+  cursor: pointer;
 }
-
-/* Pitch / lineup view */
-.teamcard h3 {
-  margin: 0 0 12px;
+.slot.sel .slotimg,
+.benchitem.sel .benchimg {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 3px rgba(241, 196, 15, 0.45);
+}
+.benchitem {
+  cursor: pointer;
 }
 .pitch {
   background: repeating-linear-gradient(0deg, #1f7a43 0 38px, #1c6f3d 38px 76px);

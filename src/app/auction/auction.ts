@@ -9,12 +9,33 @@ import { isFirebaseConfigured } from '../firebase-config';
 const STORE_KEY = 'football-auction';
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'ATT'];
 
-type Formation = '4-3-3' | '4-4-2' | '3-5-2';
-const FORMATIONS: Record<Formation, { DEF: number; MID: number; ATT: number }> = {
-  '4-3-3': { DEF: 4, MID: 3, ATT: 3 },
-  '4-4-2': { DEF: 4, MID: 4, ATT: 2 },
-  '3-5-2': { DEF: 3, MID: 5, ATT: 2 },
+// Each formation = outfield lines from defence → attack (GK implied). Every
+// entry sums to 10 outfield players (+1 GK = a starting XI).
+const FORMATIONS: Record<string, number[]> = {
+  '4-3-3': [4, 3, 3],
+  '4-4-2': [4, 4, 2],
+  '4-2-3-1': [4, 2, 3, 1],
+  '4-5-1': [4, 5, 1],
+  '4-1-4-1': [4, 1, 4, 1],
+  '4-4-1-1': [4, 4, 1, 1],
+  '4-3-2-1': [4, 3, 2, 1],
+  '4-2-2-2': [4, 2, 2, 2],
+  '3-4-3': [3, 4, 3],
+  '3-5-2': [3, 5, 2],
+  '3-4-2-1': [3, 4, 2, 1],
+  '3-1-4-2': [3, 1, 4, 2],
+  '3-2-4-1': [3, 2, 4, 1],
+  '5-3-2': [5, 3, 2],
+  '5-4-1': [5, 4, 1],
+  '5-2-3': [5, 2, 3],
 };
+const FORMATION_KEYS = Object.keys(FORMATIONS);
+const POS_RANK: Record<Position, number> = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
+
+interface Slot {
+  id: string;
+  entry: SquadEntry;
+}
 
 @Component({
   selector: 'app-auction',
@@ -105,9 +126,10 @@ export class Auction implements OnInit {
   readonly photoMap = signal<Record<string, string | null>>({});
   private requested = new Set<string>();
 
-  // Formation for the pitch / lineup view.
-  readonly formationKeys = Object.keys(FORMATIONS) as Formation[];
-  readonly formation = signal<Formation>('4-3-3');
+  // Pitch / lineup view.
+  readonly formationKeys = FORMATION_KEYS;
+  /** Currently picked player (for tap-to-swap), scoped to a team. */
+  readonly selected = signal<{ teamId: string; id: string } | null>(null);
 
   constructor() {
     // Whenever a new player comes up, fetch their photo (with a guard so a
@@ -250,28 +272,94 @@ export class Auction implements OnInit {
     return this.svc.verdict(price, value);
   }
 
-  setFormation(f: Formation) {
-    this.formation.set(f);
+  formationFor(teamId: string): string {
+    return this.room()?.lineups?.[teamId]?.formation ?? '4-3-3';
   }
 
-  /** Pitch rows top→bottom (ATT, MID, DEF, GK); empty slots are null. */
-  pitchRows(teamId: string): (SquadEntry | null)[][] {
-    const f = FORMATIONS[this.formation()];
-    const fill = (pos: Position, n: number): (SquadEntry | null)[] => {
-      const arr: (SquadEntry | null)[] = this.squadByPosition(teamId, pos).slice(0, n);
-      while (arr.length < n) arr.push(null);
-      return arr;
-    };
-    return [fill('ATT', f.ATT), fill('MID', f.MID), fill('DEF', f.DEF), fill('GK', 1)];
+  private squadMap(teamId: string): Record<string, SquadEntry> {
+    return this.room()?.squads?.[teamId] ?? {};
   }
 
-  /** Players not in the starting XI for the chosen formation. */
-  benchOf(teamId: string): SquadEntry[] {
-    const f = FORMATIONS[this.formation()];
-    const counts: Record<Position, number> = { GK: 1, DEF: f.DEF, MID: f.MID, ATT: f.ATT };
-    const bench: SquadEntry[] = [];
-    for (const pos of this.positions) bench.push(...this.squadByPosition(teamId, pos).slice(counts[pos]));
-    return bench;
+  /** Player ids for a team, starters-first, honouring any saved arrangement. */
+  orderFor(teamId: string): string[] {
+    const map = this.squadMap(teamId);
+    const valid = Object.keys(map);
+    // Default order: by position (GK→ATT), then most valuable first.
+    const def = [...valid].sort((a, b) => {
+      const r = POS_RANK[map[a].position] - POS_RANK[map[b].position];
+      return r !== 0 ? r : map[b].value - map[a].value;
+    });
+    const stored = this.room()?.lineups?.[teamId]?.order;
+    if (!stored) return def;
+    // Keep saved order, drop stale ids, append any new ones.
+    const order = stored.filter((id) => valid.includes(id));
+    for (const id of def) if (!order.includes(id)) order.push(id);
+    return order;
+  }
+
+  /** Pitch rows top→bottom (ATT … GK); empty slots are null. */
+  pitchRows(teamId: string): (Slot | null)[][] {
+    const map = this.squadMap(teamId);
+    const order = this.orderFor(teamId);
+    const lines = FORMATIONS[this.formationFor(teamId)] ?? FORMATIONS['4-3-3'];
+    const counts = [1, ...lines]; // GK → ATT
+    const rows: (Slot | null)[][] = [];
+    let i = 0;
+    for (const c of counts) {
+      const row: (Slot | null)[] = [];
+      for (let k = 0; k < c; k++) {
+        const id = order[i++];
+        const entry = id ? map[id] : undefined;
+        row.push(entry ? { id, entry } : null);
+      }
+      rows.push(row);
+    }
+    return rows.reverse(); // attack on top, GK at the bottom
+  }
+
+  /** Subs = players beyond the 11 starting slots. */
+  benchOf(teamId: string): Slot[] {
+    const map = this.squadMap(teamId);
+    return this.orderFor(teamId)
+      .slice(11)
+      .map((id) => ({ id, entry: map[id] }))
+      .filter((s): s is Slot => !!s.entry);
+  }
+
+  isSelected(teamId: string, id: string | null): boolean {
+    const s = this.selected();
+    return !!s && !!id && s.teamId === teamId && s.id === id;
+  }
+
+  /** Tap a player to pick him; tap another on the same team to swap spots. */
+  tapPlayer(teamId: string, id: string | null) {
+    if (!id) return;
+    const s = this.selected();
+    if (!s || s.teamId !== teamId) {
+      this.selected.set({ teamId, id });
+      return;
+    }
+    if (s.id === id) {
+      this.selected.set(null); // tap again to deselect
+      return;
+    }
+    this.swap(teamId, s.id, id);
+    this.selected.set(null);
+  }
+
+  private swap(teamId: string, idA: string, idB: string) {
+    const order = [...this.orderFor(teamId)];
+    const ia = order.indexOf(idA);
+    const ib = order.indexOf(idB);
+    if (ia < 0 || ib < 0 || ia === ib) return;
+    [order[ia], order[ib]] = [order[ib], order[ia]];
+    const code = this.room()?.code;
+    if (code) this.svc.saveLineup(code, teamId, this.formationFor(teamId), order);
+  }
+
+  changeFormation(teamId: string, f: string) {
+    const code = this.room()?.code;
+    if (code) this.svc.saveLineup(code, teamId, f, this.orderFor(teamId));
   }
 
   photo(name: string): string | null {
