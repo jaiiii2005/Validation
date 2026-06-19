@@ -1,8 +1,9 @@
-import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuctionService } from './auction.service';
 import { POSITION_LABEL, type Position } from './players';
+import { getPlayerPhoto } from './photos';
 import { isFirebaseConfigured } from '../firebase-config';
 
 const STORE_KEY = 'football-auction';
@@ -89,6 +90,22 @@ export class Auction implements OnInit {
 
   /** The most recent completed sale, for the verdict banner. */
   readonly lastSale = computed(() => this.room()?.lastSale);
+
+  /** Photo of the player currently up for auction (null → show placeholder). */
+  readonly photoUrl = signal<string | null>(null);
+
+  constructor() {
+    // Whenever a new player comes up, fetch their photo (with a guard so a
+    // slow response for a previous player can't overwrite the current one).
+    effect(() => {
+      const p = this.currentPlayer();
+      this.photoUrl.set(null);
+      if (!p) return;
+      getPlayerPhoto(p.name).then((url) => {
+        if (this.currentPlayer()?.id === p.id) this.photoUrl.set(url);
+      });
+    });
+  }
 
   ngOnInit() {
     const saved = this.readStore();
