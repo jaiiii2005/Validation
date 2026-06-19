@@ -175,7 +175,12 @@ export class AuctionService {
     const drawn = room.drawn ?? {};
     const pool = PLAYERS.filter((p) => !drawn[p.id]);
 
-    if (pool.length === 0) {
+    // Finish when the pool runs out OR every team's squad is full — otherwise
+    // we'd keep drawing players nobody can buy.
+    const teams = Object.values(room.teams ?? {});
+    const allSquadsFull = teams.length > 0 && teams.every((t) => this.slotsLeft(room, t.id) <= 0);
+
+    if (pool.length === 0 || allSquadsFull) {
       await update(this.roomRef(code), {
         status: 'done',
         current: {
