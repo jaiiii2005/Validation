@@ -524,10 +524,7 @@ summary {
   font-weight: 700;
   font-size: 0.9rem;
 }
-.slot {
-  cursor: pointer;
-}
-.slot.sel .slotimg,
+.dot.sel .slotimg,
 .benchitem.sel .benchimg {
   border-color: var(--accent2);
   box-shadow: 0 0 0 3px rgba(241, 196, 15, 0.45);
@@ -536,22 +533,25 @@ summary {
   cursor: pointer;
 }
 .pitch {
-  background: repeating-linear-gradient(0deg, #1f7a43 0 38px, #1c6f3d 38px 76px);
+  position: relative;
+  height: 460px;
+  background: repeating-linear-gradient(0deg, #1f7a43 0 46px, #1c6f3d 46px 92px);
   border: 1px solid #2a8a4f;
   border-radius: 14px;
-  padding: 18px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  overflow: hidden;
 }
-.prow {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-start;
-}
-.slot {
-  width: 62px;
+.dot {
+  position: absolute;
+  width: 64px;
+  margin-left: -32px;
+  margin-top: -28px;
   text-align: center;
+  cursor: grab;
+  touch-action: none; /* let pointer-drag work without scrolling the page */
+  user-select: none;
+}
+.dot:active {
+  cursor: grabbing;
 }
 .slotimg {
   width: 48px;
@@ -572,15 +572,6 @@ summary {
   font-weight: 800;
   color: #cfe9d8;
   border-color: rgba(255, 255, 255, 0.5);
-}
-.slot.empty::before {
-  content: '';
-  display: block;
-  width: 48px;
-  height: 48px;
-  margin: 0 auto;
-  border-radius: 50%;
-  border: 2px dashed rgba(255, 255, 255, 0.35);
 }
 .slotname {
   margin-top: 4px;

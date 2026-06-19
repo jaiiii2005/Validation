@@ -37,6 +37,11 @@ interface Slot {
   entry: SquadEntry;
 }
 
+interface PlacedSlot extends Slot {
+  x: number;
+  y: number;
+}
+
 @Component({
   selector: 'app-auction',
   imports: [CommonModule, FormsModule],
@@ -130,6 +135,16 @@ export class Auction implements OnInit {
   readonly formationKeys = FORMATION_KEYS;
   /** Currently picked player (for tap-to-swap), scoped to a team. */
   readonly selected = signal<{ teamId: string; id: string } | null>(null);
+  /** Live position of the player being dragged (so the dot follows the finger). */
+  readonly livePos = signal<{ teamId: string; id: string; x: number; y: number } | null>(null);
+  private drag: {
+    teamId: string;
+    id: string;
+    startX: number;
+    startY: number;
+    rect: DOMRect;
+    moved: boolean;
+  } | null = null;
 
   constructor() {
     // Whenever a new player comes up, fetch their photo (with a guard so a
@@ -297,24 +312,40 @@ export class Auction implements OnInit {
     return order;
   }
 
-  /** Pitch rows top→bottom (ATT … GK); empty slots are null. */
-  pitchRows(teamId: string): (Slot | null)[][] {
+  /**
+   * Starting XI as absolutely-placed dots (x/y in %). Position is the saved
+   * free-move override if any, else the formation's default slot, and the
+   * live position while a drag is in progress.
+   */
+  starters(teamId: string): PlacedSlot[] {
     const map = this.squadMap(teamId);
     const order = this.orderFor(teamId);
     const lines = FORMATIONS[this.formationFor(teamId)] ?? FORMATIONS['4-3-3'];
-    const counts = [1, ...lines]; // GK → ATT
-    const rows: (Slot | null)[][] = [];
+    const counts = [1, ...lines]; // GK → ATT (back to front)
+    const outfieldLines = counts.length - 1;
+    const placed: PlacedSlot[] = [];
     let i = 0;
-    for (const c of counts) {
-      const row: (Slot | null)[] = [];
-      for (let k = 0; k < c; k++) {
+    for (let li = 0; li < counts.length; li++) {
+      const n = counts[li];
+      // GK at the back; outfield lines spread up toward the attack.
+      const dy = li === 0 ? 90 : 74 - (li - 1) * (62 / Math.max(outfieldLines - 1, 1));
+      for (let j = 0; j < n; j++) {
         const id = order[i++];
         const entry = id ? map[id] : undefined;
-        row.push(entry ? { id, entry } : null);
+        if (!id || !entry) continue;
+        const dx = ((j + 1) / (n + 1)) * 100;
+        const p = this.posFor(teamId, id, dx, dy);
+        placed.push({ id, entry, x: p.x, y: p.y });
       }
-      rows.push(row);
     }
-    return rows.reverse(); // attack on top, GK at the bottom
+    return placed;
+  }
+
+  private posFor(teamId: string, id: string, dx: number, dy: number): { x: number; y: number } {
+    const lp = this.livePos();
+    if (lp && lp.teamId === teamId && lp.id === id) return { x: lp.x, y: lp.y };
+    const stored = this.room()?.lineups?.[teamId]?.pos?.[id];
+    return stored ?? { x: dx, y: dy };
   }
 
   /** Subs = players beyond the 11 starting slots. */
@@ -359,7 +390,53 @@ export class Auction implements OnInit {
 
   changeFormation(teamId: string, f: string) {
     const code = this.room()?.code;
-    if (code) this.svc.saveLineup(code, teamId, f, this.orderFor(teamId));
+    if (code) this.svc.saveLineup(code, teamId, f, this.orderFor(teamId), true);
+  }
+
+  // ── Free-move drag (pointer events; works for mouse and touch) ─────────
+  // A small movement is treated as a tap (select/swap); a larger one drags
+  // the player to a new spot and saves it.
+
+  onPointerDown(teamId: string, id: string, ev: PointerEvent) {
+    const pitch = (ev.currentTarget as HTMLElement).closest('.pitch');
+    if (!pitch) return;
+    this.drag = {
+      teamId,
+      id,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      rect: pitch.getBoundingClientRect(),
+      moved: false,
+    };
+    (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+  }
+
+  onPointerMove(ev: PointerEvent) {
+    const d = this.drag;
+    if (!d) return;
+    if (Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) > 6) d.moved = true;
+    if (!d.moved) return;
+    const x = this.clamp(((ev.clientX - d.rect.left) / d.rect.width) * 100, 4, 96);
+    const y = this.clamp(((ev.clientY - d.rect.top) / d.rect.height) * 100, 6, 94);
+    this.livePos.set({ teamId: d.teamId, id: d.id, x, y });
+  }
+
+  onPointerUp() {
+    const d = this.drag;
+    this.drag = null;
+    if (!d) return;
+    if (!d.moved) {
+      this.tapPlayer(d.teamId, d.id); // treat as a tap
+    } else {
+      const lp = this.livePos();
+      const code = this.room()?.code;
+      if (lp && code) this.svc.savePos(code, d.teamId, d.id, lp.x, lp.y);
+    }
+    this.livePos.set(null);
+  }
+
+  private clamp(v: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, v));
   }
 
   photo(name: string): string | null {

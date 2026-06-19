@@ -252,8 +252,9 @@
       }
 
       <p class="muted small swaphint">
-        Pick a formation per team. Tap a player then another to swap them — works
-        between the pitch and the subs (sub in / sub out).
+        Pick a formation per team. <strong>Drag</strong> a player anywhere on the pitch to
+        free-move him. <strong>Tap</strong> a player then another to swap them — including
+        with the subs (sub in / sub out).
       </p>
 
       <div class="final">
@@ -273,26 +274,23 @@
             </div>
 
             <div class="pitch">
-              @for (row of pitchRows(t.id); track $index) {
-                <div class="prow">
-                  @for (slot of row; track $index) {
-                    <div
-                      class="slot"
-                      [class.empty]="!slot"
-                      [class.sel]="slot && isSelected(t.id, slot.id)"
-                      (click)="tapPlayer(t.id, slot ? slot.id : null)"
-                    >
-                      @if (slot) {
-                        @if (photo(slot.entry.name); as ph) {
-                          <img class="slotimg" [src]="ph" [alt]="slot.entry.name" />
-                        } @else {
-                          <div class="slotimg ph">{{ slot.entry.position }}</div>
-                        }
-                        <div class="slotname">{{ shortName(slot.entry.name) }}</div>
-                        <div class="slotprice">{{ slot.entry.price }}m</div>
-                      }
-                    </div>
+              @for (s of starters(t.id); track s.id) {
+                <div
+                  class="dot"
+                  [class.sel]="isSelected(t.id, s.id)"
+                  [style.left.%]="s.x"
+                  [style.top.%]="s.y"
+                  (pointerdown)="onPointerDown(t.id, s.id, $event)"
+                  (pointermove)="onPointerMove($event)"
+                  (pointerup)="onPointerUp()"
+                >
+                  @if (photo(s.entry.name); as ph) {
+                    <img class="slotimg" [src]="ph" [alt]="s.entry.name" />
+                  } @else {
+                    <div class="slotimg ph">{{ s.entry.position }}</div>
                   }
+                  <div class="slotname">{{ shortName(s.entry.name) }}</div>
+                  <div class="slotprice">{{ s.entry.price }}m</div>
                 </div>
               }
             </div>

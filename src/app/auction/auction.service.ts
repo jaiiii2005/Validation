@@ -66,8 +66,14 @@ export interface Room {
   squads: Record<string, Record<string, SquadEntry>>;
   current: CurrentLot;
   lastSale?: LastSale;
-  /** Per-team pitch arrangement: chosen formation + player order (starters first). */
-  lineups?: Record<string, { formation: string; order: string[] }>;
+  /**
+   * Per-team pitch arrangement: chosen formation, player order (starters
+   * first), and optional free-move position overrides (x/y as % of pitch).
+   */
+  lineups?: Record<
+    string,
+    { formation: string; order: string[]; pos?: Record<string, { x: number; y: number }> }
+  >;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no easily-confused chars
@@ -421,8 +427,28 @@ export class AuctionService {
     return PLAYERS.length;
   }
 
-  /** Save a team's pitch arrangement (formation + ordered player ids). */
-  async saveLineup(code: string, teamId: string, formation: string, order: string[]) {
-    await update(this.roomRef(code), { [`lineups/${teamId}`]: { formation, order } });
+  /**
+   * Save a team's formation + player order. Writes only those keys so custom
+   * drag positions survive; pass `resetPos` to clear them (e.g. on a formation
+   * change, so the new shape lays out fresh).
+   */
+  async saveLineup(
+    code: string,
+    teamId: string,
+    formation: string,
+    order: string[],
+    resetPos = false,
+  ) {
+    const upd: Record<string, unknown> = {
+      [`lineups/${teamId}/formation`]: formation,
+      [`lineups/${teamId}/order`]: order,
+    };
+    if (resetPos) upd[`lineups/${teamId}/pos`] = null;
+    await update(this.roomRef(code), upd);
+  }
+
+  /** Save a single player's free-move position (x/y as % of the pitch). */
+  async savePos(code: string, teamId: string, id: string, x: number, y: number) {
+    await update(this.roomRef(code), { [`lineups/${teamId}/pos/${id}`]: { x, y } });
   }
 }
