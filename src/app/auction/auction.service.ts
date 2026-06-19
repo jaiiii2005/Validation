@@ -28,6 +28,16 @@ export interface SquadEntry {
   club: string;
   position: Position;
   price: number;
+  value: number;
+}
+
+/** The most recent completed sale, for the smart-auction verdict banner. */
+export interface LastSale {
+  name: string;
+  club: string;
+  price: number;
+  value: number;
+  teamName: string;
 }
 
 export interface CurrentLot {
@@ -55,6 +65,7 @@ export interface Room {
   drawn: Record<string, true>;
   squads: Record<string, Record<string, SquadEntry>>;
   current: CurrentLot;
+  lastSale?: LastSale;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no easily-confused chars
@@ -218,6 +229,14 @@ export class AuctionService {
         club: player.club,
         position: player.position,
         price: cur.bid,
+        value: player.value,
+      },
+      lastSale: {
+        name: player.name,
+        club: player.club,
+        price: cur.bid,
+        value: player.value,
+        teamName: team.name,
       },
     });
     await this.drawNext(code);
@@ -322,6 +341,14 @@ export class AuctionService {
         club: player.club,
         position: player.position,
         price,
+        value: player.value,
+      },
+      lastSale: {
+        name: player.name,
+        club: player.club,
+        price,
+        value: player.value,
+        teamName: winner.name,
       },
     });
     await this.drawNext(code);
@@ -363,6 +390,19 @@ export class AuctionService {
     return Object.values(room.teams ?? {}).filter(
       (t) => !passed[t.id] && this.slotsLeft(room, t.id) > 0,
     ).length;
+  }
+
+  /**
+   * Smart-auction verdict comparing price paid to market value.
+   * `kind` drives the colour styling; `label` is the badge text.
+   */
+  verdict(price: number, value: number): { label: string; kind: string } {
+    const ratio = value > 0 ? price / value : 1;
+    if (ratio <= 0.6) return { label: '🟢 GREAT STEAL', kind: 'steal' };
+    if (ratio <= 0.85) return { label: '🟢 Good deal', kind: 'good' };
+    if (ratio < 1.25) return { label: '🟡 Fair price', kind: 'fair' };
+    if (ratio < 1.75) return { label: '🔴 Overpaid', kind: 'over' };
+    return { label: '🔴 MASSIVE overpay', kind: 'over2' };
   }
 
   player(id: string | null): Player | undefined {

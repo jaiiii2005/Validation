@@ -93,12 +93,23 @@
     <!-- ───────── Live auction ───────── -->
     <div class="live">
       <div class="stage">
+        @if (lastSale(); as ls) {
+          <div class="verdict-banner" [attr.data-kind]="verdict(ls.price, ls.value).kind">
+            <span class="vlabel">{{ verdict(ls.price, ls.value).label }}</span>
+            <span class="vtext">
+              {{ ls.teamName }} got <strong>{{ ls.name }}</strong> for {{ ls.price }}m
+              <em class="muted">(market value {{ ls.value }}m)</em>
+            </span>
+          </div>
+        }
+
         @if (currentPlayer(); as p) {
           <div class="player-card" [attr.data-pos]="p.position">
             <div class="pos-badge">{{ p.position }}</div>
             <div class="pname">{{ p.name }}</div>
             <div class="pclub">{{ p.club }}</div>
             <div class="prole">{{ positionLabel[p.position] }}</div>
+            <div class="pvalue">Market value <strong>{{ p.value }}m</strong></div>
             @if (p.note) {
               <div class="pnote">{{ p.note }}</div>
             }
@@ -170,6 +181,9 @@
                 <span class="topname">
                   {{ s.name }}
                   <em class="muted">→ {{ s.team }}</em>
+                  <span class="vbadge" [attr.data-kind]="verdict(s.price, s.value).kind">
+                    {{ verdict(s.price, s.value).label }}
+                  </span>
                 </span>
                 <span class="topprice">{{ s.price }}m</span>
               </div>
@@ -220,7 +234,12 @@
           @for (s of topSigned(); track $index; let i = $index) {
             <div class="toprow" [class.record]="i === 0">
               <span class="rank">{{ i === 0 ? '🏆' : i + 1 }}</span>
-              <span class="topname">{{ s.name }} <em class="muted">→ {{ s.team }}</em></span>
+              <span class="topname">
+                {{ s.name }} <em class="muted">→ {{ s.team }}</em>
+                <span class="vbadge" [attr.data-kind]="verdict(s.price, s.value).kind">
+                  {{ verdict(s.price, s.value).label }}
+                </span>
+              </span>
               <span class="topprice">{{ s.price }}m</span>
             </div>
           }

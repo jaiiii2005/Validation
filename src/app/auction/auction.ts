@@ -78,14 +78,17 @@ export class Auction implements OnInit {
   readonly topSigned = computed(() => {
     const r = this.room();
     if (!r) return [];
-    const all: { name: string; club: string; price: number; team: string }[] = [];
+    const all: { name: string; club: string; price: number; value: number; team: string }[] = [];
     for (const t of Object.values(r.teams ?? {})) {
       for (const e of Object.values(r.squads?.[t.id] ?? {})) {
-        all.push({ name: e.name, club: e.club, price: e.price, team: t.name });
+        all.push({ name: e.name, club: e.club, price: e.price, value: e.value, team: t.name });
       }
     }
     return all.sort((a, b) => b.price - a.price).slice(0, 6);
   });
+
+  /** The most recent completed sale, for the verdict banner. */
+  readonly lastSale = computed(() => this.room()?.lastSale);
 
   ngOnInit() {
     const saved = this.readStore();
@@ -194,6 +197,10 @@ export class Auction implements OnInit {
   activeCount() {
     const r = this.room();
     return r ? this.svc.activeCount(r) : 0;
+  }
+
+  verdict(price: number, value: number) {
+    return this.svc.verdict(price, value);
   }
 
   private persist(code: string) {
