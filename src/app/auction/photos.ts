@@ -1,10 +1,15 @@
-// Best-effort player photos via the Wikipedia REST summary API (free, no key,
-// CORS-enabled). Returns a thumbnail URL or null — when null, the player card
-// shows its coloured placeholder instead. Results are cached for the session.
+// Best-effort player photos via Wikipedia (free, no key, CORS-enabled).
+// Strategy, in order:
+//   1. If the name is pinned below (ambiguous/common names), use that exact
+//      article's image — guarantees the right person.
+//   2. Otherwise search "<name> footballer" and take the top result's image.
+//      This covers the large majority of players.
+//   3. Fall back to the exact name as an article title.
+// Returns a thumbnail URL or null. When null, the card shows its coloured
+// placeholder. Results are cached for the session.
 //
-// Ambiguous / common names are pinned to the correct article so we don't pull
-// the wrong person. If a guess 404s we just get null (placeholder), never a
-// wrong photo, because disambiguation pages have no thumbnail.
+// Note: a handful of players simply have no free image on Wikipedia — those
+// will always show the placeholder. That's the limit of a free, no-key source.
 
 const WIKI_TITLE: Record<string, string> = {
   Rodri: 'Rodri (footballer, born 1996)',
@@ -13,7 +18,6 @@ const WIKI_TITLE: Record<string, string> = {
   Gavi: 'Gavi (footballer)',
   'Nico González': 'Nico González (footballer, born 2002)',
   Ederson: 'Ederson (footballer, born 1993)',
-  Alisson: 'Alisson',
   Vitinha: 'Vitinha (footballer, born 2000)',
   'João Neves': 'João Neves (footballer, born 2004)',
   Marquinhos: 'Marquinhos (footballer, born 1994)',
@@ -22,36 +26,49 @@ const WIKI_TITLE: Record<string, string> = {
   Raphinha: 'Raphinha (footballer, born 1996)',
   'Pedro Neto': 'Pedro Neto (footballer, born 2000)',
   Estêvão: 'Estêvão (footballer, born 2007)',
-  'Nico Williams': 'Nico Williams (footballer, born 2002)',
   Emerson: 'Emerson Royal',
-  Casemiro: 'Casemiro',
-  Joelinton: 'Joelinton',
-  Endrick: 'Endrick',
-  Pedri: 'Pedri',
-  'Brahim Díaz': 'Brahim Díaz',
-  'Fabián Ruiz': 'Fabián Ruiz',
+  'Fabián Ruiz': 'Fabián Ruiz Peña',
 };
 
 const cache = new Map<string, string | null>();
 
+async function summaryThumb(title: string): Promise<string | null> {
+  const res = await fetch(
+    `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { thumbnail?: { source?: string } };
+  return data.thumbnail?.source ?? null;
+}
+
+async function searchThumb(query: string): Promise<string | null> {
+  const url =
+    `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*` +
+    `&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1` +
+    `&prop=pageimages&piprop=thumbnail&pithumbsize=320`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    query?: { pages?: Record<string, { thumbnail?: { source?: string } }> };
+  };
+  const pages = data.query?.pages;
+  if (!pages) return null;
+  const first = Object.values(pages)[0];
+  return first?.thumbnail?.source ?? null;
+}
+
 export async function getPlayerPhoto(name: string): Promise<string | null> {
   if (cache.has(name)) return cache.get(name) ?? null;
 
-  const title = WIKI_TITLE[name] ?? name;
+  let url: string | null = null;
   try {
-    const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-    );
-    if (!res.ok) {
-      cache.set(name, null);
-      return null;
-    }
-    const data = (await res.json()) as { thumbnail?: { source?: string } };
-    const url = data.thumbnail?.source ?? null;
-    cache.set(name, url);
-    return url;
+    const pinned = WIKI_TITLE[name];
+    if (pinned) url = await summaryThumb(pinned);
+    if (!url) url = await searchThumb(`${name} footballer`);
+    if (!url) url = await summaryThumb(name);
   } catch {
-    cache.set(name, null);
-    return null;
+    url = null;
   }
+  cache.set(name, url);
+  return url;
 }
