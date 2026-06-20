@@ -36,6 +36,10 @@
             <label>Min bid</label>
             <input type="number" [(ngModel)]="minBid" min="1" max="10" />
           </div>
+          <div>
+            <label>Bid timer (s, 0=off)</label>
+            <input type="number" [(ngModel)]="timer" min="0" max="60" />
+          </div>
         </div>
         <button (click)="create()" [disabled]="busy()">Create &amp; host</button>
       </div>
@@ -131,7 +135,22 @@
               } @else {
                 <span class="muted">no bids yet</span>
               }
+              @if (secondsLeft() !== null) {
+                <span class="timer" [class.warn]="secondsLeft()! <= 5">⏱ {{ secondsLeft() }}s</span>
+              }
             </div>
+
+            @if (secondsLeft() !== null && secondsLeft()! <= 3) {
+              <p class="going" [class.last]="secondsLeft()! <= 1">
+                {{
+                  secondsLeft()! <= 1
+                    ? 'SOLD!'
+                    : room()!.current.leaderId
+                      ? (secondsLeft() === 3 ? 'Going once…' : 'Going twice…')
+                      : 'No bids — moving on…'
+                }}
+              </p>
+            }
 
             <div class="bidbtns">
               <button

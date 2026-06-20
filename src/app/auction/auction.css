@@ -346,6 +346,36 @@ button.ghost {
   color: #05210f;
   font-weight: 700;
 }
+.timer {
+  margin-left: auto;
+  background: var(--line);
+  color: var(--txt);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.timer.warn {
+  background: #e74c3c;
+  color: #fff;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.going {
+  margin: 10px 0 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--accent2);
+}
+.going.last {
+  color: var(--accent);
+  font-size: 1.4rem;
+}
 .bidbtns {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

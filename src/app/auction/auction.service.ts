@@ -48,12 +48,16 @@ export interface CurrentLot {
   status: CurrentStatus;
   /** Teams that have bowed out of the current player. */
   passed?: Record<string, true>;
+  /** Epoch ms when this lot auto-finishes (absent/null = no timer). */
+  endsAt?: number | null;
 }
 
 export interface RoomConfig {
   budget: number;
   squadSize: number;
   minBid: number;
+  /** Seconds per lot before it auto-finishes; 0 = no timer. */
+  timer: number;
 }
 
 export interface Room {
@@ -203,6 +207,7 @@ export class AuctionService {
       return;
     }
     const next = pool[Math.floor(Math.random() * pool.length)];
+    const endsAt = room.config.timer > 0 ? Date.now() + room.config.timer * 1000 : null;
     await update(this.roomRef(code), {
       current: {
         playerId: next.id,
@@ -211,6 +216,7 @@ export class AuctionService {
         leaderName: null,
         status: 'bidding',
         passed: {},
+        endsAt,
       },
     });
   }
@@ -287,7 +293,9 @@ export class AuctionService {
       // Can't bid if you've passed, can't bid against yourself, and must stay
       // within your spending cap.
       if (cur.passed?.[teamId] || cur.leaderId === teamId || newBid > maxBid) return cur;
-      return { ...cur, bid: newBid, leaderId: teamId, leaderName: team.name };
+      const timer = room.config.timer;
+      const endsAt = timer > 0 ? Date.now() + timer * 1000 : (cur.endsAt ?? null);
+      return { ...cur, bid: newBid, leaderId: teamId, leaderName: team.name, endsAt };
     });
   }
 

@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuctionService, type SquadEntry } from './auction.service';
@@ -48,7 +48,7 @@ interface PlacedSlot extends Slot {
   templateUrl: './auction.html',
   styleUrl: './auction.css',
 })
-export class Auction implements OnInit {
+export class Auction implements OnInit, OnDestroy {
   private svc = inject(AuctionService);
 
   readonly configured = isFirebaseConfigured();
@@ -62,8 +62,14 @@ export class Auction implements OnInit {
   budget = 200;
   squadSize = 18;
   minBid = 1;
+  timer = 15;
   error = signal('');
   busy = signal(false);
+
+  // A ticking clock so the countdown re-renders every quarter second.
+  readonly now = signal(Date.now());
+  private ticker = setInterval(() => this.now.set(Date.now()), 250);
+  private lastFiredFor: string | null = null;
 
   // Live state from the service
   readonly room = this.svc.room;
@@ -124,6 +130,15 @@ export class Auction implements OnInit {
   /** The most recent completed sale, for the verdict banner. */
   readonly lastSale = computed(() => this.room()?.lastSale);
 
+  /** Seconds left on the current lot, or null when no timer is running. */
+  readonly secondsLeft = computed(() => {
+    const r = this.room();
+    if (!r || r.status !== 'live') return null;
+    const cur = r.current;
+    if (cur.status !== 'bidding' || !cur.endsAt) return null;
+    return Math.max(0, Math.ceil((cur.endsAt - this.now()) / 1000));
+  });
+
   /** Photo of the player currently up for auction (null → show placeholder). */
   readonly photoUrl = signal<string | null>(null);
 
@@ -166,6 +181,23 @@ export class Auction implements OnInit {
         for (const e of Object.values(r.squads?.[t.id] ?? {})) this.ensurePhoto(e.name);
       }
     });
+
+    // Host's device finishes the lot when the timer runs out (one device only,
+    // so it can't double-fire; non-hosts just watch the countdown).
+    effect(() => {
+      this.now(); // re-run on every tick
+      const r = this.room();
+      if (!r || r.status !== 'live' || !this.isHost()) return;
+      const cur = r.current;
+      if (cur.status !== 'bidding' || !cur.playerId || !cur.endsAt) return;
+      if (Date.now() < cur.endsAt || this.lastFiredFor === cur.playerId) return;
+      this.lastFiredFor = cur.playerId;
+      this.svc.sell(r.code);
+    });
+  }
+
+  ngOnDestroy() {
+    clearInterval(this.ticker);
   }
 
   private ensurePhoto(name: string) {
@@ -190,6 +222,7 @@ export class Auction implements OnInit {
         budget: this.budget,
         squadSize: this.squadSize,
         minBid: this.minBid,
+        timer: this.timer,
       });
       this.persist(code);
     } catch (e) {
