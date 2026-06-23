@@ -3,91 +3,299 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Flashcard Maker</title>
+  <title>AI Flashcards &amp; Quiz</title>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      min-height: 100vh;
-      padding: 24px 16px;
+      background: #0f172a; color: #e2e8f0; height: 100vh;
+      display: flex; justify-content: center;
     }
-    .app { max-width: 820px; margin: 0 auto; }
-    h1 { font-size: 1.6rem; }
-    p.sub { color: #94a3b8; margin: 4px 0 20px; font-size: 0.95rem; }
+    .app { width: 100%; max-width: 1040px; height: 100vh; display: flex; }
 
+    /* Sidebar */
+    .sidebar {
+      width: 230px; flex-shrink: 0; background: #0b1220; border-right: 1px solid #1e293b;
+      display: flex; flex-direction: column; padding: 12px; gap: 10px;
+    }
+    .newbtn {
+      border: 1px solid #334155; border-radius: 8px; background: #1e293b; color: #e2e8f0;
+      font-size: 0.9rem; font-weight: 600; padding: 10px; cursor: pointer;
+    }
+    .newbtn:hover { background: #273449; }
+    .deck-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .deck-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: #cbd5e1;
+    }
+    .deck-item:hover { background: #1e293b; }
+    .deck-item.active { background: #1e293b; color: #fff; }
+    .deck-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .deck-del { border: none; background: transparent; color: #64748b; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px 0 6px; }
+    .deck-del:hover { color: #f87171; }
+
+    /* Main */
+    .main { flex: 1; display: flex; flex-direction: column; padding: 22px; min-width: 0; overflow-y: auto; }
+    h1 { font-size: 1.5rem; }
+    p.sub { color: #94a3b8; margin: 4px 0 18px; font-size: 0.95rem; }
     textarea {
-      width: 100%; min-height: 150px; padding: 14px;
-      border: 1px solid #334155; border-radius: 10px;
-      background: #1e293b; color: #e2e8f0; font-size: 0.95rem; font-family: inherit;
-      resize: vertical; margin-bottom: 12px;
+      width: 100%; min-height: 150px; padding: 14px; border: 1px solid #334155; border-radius: 10px;
+      background: #1e293b; color: #e2e8f0; font-size: 0.95rem; font-family: inherit; resize: vertical; margin-bottom: 12px;
     }
     .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    button.primary {
+    .primary {
       border: none; border-radius: 9px; background: #38bdf8; color: #04283b;
       font-size: 1rem; font-weight: 700; padding: 12px 22px; cursor: pointer;
     }
-    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .hint { color: #64748b; font-size: 0.85rem; }
-
-    .status { margin: 18px 0; color: #94a3b8; }
+    .status { margin: 16px 0; color: #94a3b8; }
     .status.error { color: #f87171; }
 
-    .grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 14px; margin-top: 22px;
+    .deckhead { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    .deckhead h2 { font-size: 1.25rem; }
+    /* Clear segmented toggle so the Quiz option is obvious */
+    .modes { display: inline-flex; gap: 4px; background: #0b1220; padding: 4px; border-radius: 10px; }
+    .mode {
+      border: none; background: transparent; color: #cbd5e1;
+      border-radius: 7px; padding: 8px 16px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
     }
-    /* A flashcard: click to flip between question and answer. */
-    .card {
-      background: #1e293b; border: 1px solid #273449; border-radius: 12px;
-      min-height: 150px; padding: 16px; cursor: pointer; position: relative;
-      display: flex; align-items: center; justify-content: center; text-align: center;
-      transition: border-color 0.15s;
+    .mode.active { background: #38bdf8; color: #04283b; }
+
+    /* Cards mode — real 3D flip */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+    .card { height: 170px; cursor: pointer; perspective: 1000px; }
+    .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.5s; transform-style: preserve-3d; }
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center;
+      border-radius: 12px; border: 1px solid #273449; background: #1e293b;
     }
-    .card:hover { border-color: #38bdf8; }
-    .card .label {
-      position: absolute; top: 8px; left: 12px; font-size: 0.68rem;
-      text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;
+    .card-face .label { position: absolute; top: 8px; left: 12px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
+    .card-face .text { font-size: 0.98rem; line-height: 1.45; }
+    .card-back { transform: rotateY(180deg); background: #0b2a3a; border-color: #38bdf8; }
+    .card-back .text { color: #bae6fd; }
+    .card:hover .card-face { border-color: #38bdf8; }
+
+    /* Quiz mode */
+    .qbar { height: 8px; background: #1e293b; border-radius: 99px; overflow: hidden; max-width: 560px; margin: 0 auto 16px; }
+    .qbar-fill { height: 100%; background: #38bdf8; transition: width 0.3s; }
+    .quizcard {
+      background: #1e293b; border: 1px solid #273449; border-radius: 14px; padding: 26px;
+      max-width: 560px; margin: 10px auto; text-align: center;
     }
-    .card .text { font-size: 0.98rem; line-height: 1.45; }
-    .card.flipped { background: #0b2a3a; border-color: #38bdf8; }
-    .card.flipped .text { color: #bae6fd; }
+    .progress { color: #64748b; font-size: 0.82rem; margin-bottom: 16px; }
+    .qtext { font-size: 1.25rem; line-height: 1.5; margin-bottom: 20px; }
+    .atext { background: #0b2a3a; border: 1px solid #38bdf8; color: #bae6fd; border-radius: 10px; padding: 14px; margin-bottom: 20px; line-height: 1.5; animation: fade 0.25s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .gradebtns { display: flex; gap: 10px; justify-content: center; }
+    .gotit, .missed { border: none; border-radius: 9px; font-size: 0.95rem; font-weight: 700; padding: 11px 20px; cursor: pointer; }
+    .gotit { background: #22c55e; color: #052e16; }
+    .missed { background: #7f1d1d; color: #fecaca; }
+    .quizend { text-align: center; margin: 30px auto; }
+    .quizend h3 { font-size: 1.5rem; }
+    .score { font-size: 1.6rem; font-weight: 700; color: #38bdf8; margin: 14px 0 20px; }
   </style>
 </head>
 
 <body>
   <div class="app">
-    <h1>AI Flashcard Maker</h1>
-    <p class="sub">Paste your study notes and get instant flashcards. Click a card to flip it.</p>
+    <aside class="sidebar">
+      <button class="newbtn" onclick="newDeck()">+ New deck</button>
+      <div class="deck-list" id="deckList"></div>
+    </aside>
 
-    <textarea id="notes" placeholder="Paste your notes here — e.g. a topic from your course..."></textarea>
+    <main class="main">
+      <section id="createPanel">
+        <h1>AI Flashcards &amp; Quiz</h1>
+        <p class="sub">Paste study notes → get a deck of flashcards you can flip and quiz yourself on.</p>
+        <textarea id="notes" placeholder="Paste your notes here — e.g. a topic from your course..."></textarea>
+        <div class="controls">
+          <button class="primary" id="gen" onclick="generate()">Generate deck</button>
+          <span class="hint">Tip: paste a few paragraphs for the best cards.</span>
+        </div>
+        <div class="status" id="status"></div>
+      </section>
 
-    <div class="controls">
-      <button class="primary" id="gen" onclick="generate()">Generate flashcards</button>
-      <span class="hint">Tip: paste a few paragraphs for the best cards.</span>
-    </div>
-
-    <div class="status" id="status"></div>
-    <div class="grid" id="grid"></div>
+      <section id="deckPanel" hidden>
+        <div class="deckhead">
+          <h2 id="deckName"></h2>
+          <div class="modes">
+            <button id="modeCards" class="mode active" onclick="setMode('cards')">🃏 Cards</button>
+            <button id="modeQuiz" class="mode" onclick="setMode('quiz')">🎯 Quiz me</button>
+          </div>
+        </div>
+        <div id="cardsView" class="grid"></div>
+        <div id="quizView" hidden></div>
+      </section>
+    </main>
   </div>
 
   <script>
-    // Reuse the same backend we built for the Code Tutor — it just forwards
-    // requests to Gemini, so any tool can use it. The key stays hidden there.
     const WORKER_URL = "https://c-tutor.jkadvertising.workers.dev";
+    const DECKS_KEY = "flashDecks";
+    const ACTIVE_KEY = "flashActiveId";
 
+    const deckList = document.getElementById("deckList");
+    const createPanel = document.getElementById("createPanel");
+    const deckPanel = document.getElementById("deckPanel");
     const notesEl = document.getElementById("notes");
     const genBtn = document.getElementById("gen");
     const statusEl = document.getElementById("status");
-    const grid = document.getElementById("grid");
+    const deckNameEl = document.getElementById("deckName");
+    const cardsView = document.getElementById("cardsView");
+    const quizView = document.getElementById("quizView");
+    const modeCardsBtn = document.getElementById("modeCards");
+    const modeQuizBtn = document.getElementById("modeQuiz");
+
+    let decks = [];
+    let activeId = null;
+    let mode = "cards";
+    let quizIndex = 0, quizScore = 0, quizRevealed = false;
+
+    function loadDecks() {
+      try { decks = JSON.parse(localStorage.getItem(DECKS_KEY)) || []; }
+      catch (e) { decks = []; }
+      activeId = localStorage.getItem(ACTIVE_KEY);
+    }
+    function saveDecks() {
+      localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
+      localStorage.setItem(ACTIVE_KEY, activeId || "");
+    }
+    function activeDeck() { return decks.find((d) => d.id === activeId); }
+
+    function escapeHtml(t) {
+      return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function showCreate() { createPanel.hidden = false; deckPanel.hidden = true; }
+    function showDeck() { createPanel.hidden = true; deckPanel.hidden = false; }
+
+    function newDeck() {
+      activeId = null;
+      saveDecks();
+      notesEl.value = "";
+      setStatus("");
+      renderSidebar();
+      showCreate();
+      notesEl.focus();
+    }
+
+    function openDeck(id) {
+      activeId = id;
+      saveDecks();
+      renderSidebar();
+      const d = activeDeck();
+      if (!d) { showCreate(); return; }
+      deckNameEl.textContent = d.name;
+      setMode("cards");
+      showDeck();
+    }
+
+    function deleteDeck(id) {
+      decks = decks.filter((d) => d.id !== id);
+      if (activeId === id) activeId = null;
+      saveDecks();
+      renderSidebar();
+      if (activeDeck()) openDeck(activeId); else newDeck();
+    }
+
+    function renderSidebar() {
+      deckList.innerHTML = "";
+      decks.forEach((deck) => {
+        const item = document.createElement("div");
+        item.className = "deck-item" + (deck.id === activeId ? " active" : "");
+        const name = document.createElement("span");
+        name.className = "deck-name";
+        name.textContent = deck.name;
+        name.onclick = () => openDeck(deck.id);
+        const del = document.createElement("button");
+        del.className = "deck-del";
+        del.textContent = "×";
+        del.title = "Delete deck";
+        del.onclick = (e) => { e.stopPropagation(); deleteDeck(deck.id); };
+        item.appendChild(name);
+        item.appendChild(del);
+        deckList.appendChild(item);
+      });
+    }
+
+    function setMode(m) {
+      mode = m;
+      modeCardsBtn.classList.toggle("active", m === "cards");
+      modeQuizBtn.classList.toggle("active", m === "quiz");
+      cardsView.hidden = m !== "cards";
+      quizView.hidden = m !== "quiz";
+      if (m === "cards") {
+        renderCards();
+      } else {
+        quizIndex = 0; quizScore = 0; quizRevealed = false;
+        renderQuiz();
+      }
+    }
+
+    // Cards mode — real 3D flip (front = question, back = answer).
+    function renderCards() {
+      const d = activeDeck();
+      cardsView.innerHTML = "";
+      d.cards.forEach((card) => {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.innerHTML =
+          '<div class="card-inner">'
+          + '<div class="card-face card-front"><span class="label">Question</span><div class="text">' + escapeHtml(card.q) + '</div></div>'
+          + '<div class="card-face card-back"><span class="label">Answer</span><div class="text">' + escapeHtml(card.a) + '</div></div>'
+          + '</div>';
+        el.addEventListener("click", () => el.classList.toggle("flipped"));
+        cardsView.appendChild(el);
+      });
+    }
+
+    // Quiz mode — one question at a time, with a progress bar and score.
+    function renderQuiz() {
+      const d = activeDeck();
+      const total = d.cards.length;
+      if (quizIndex >= total) {
+        const pct = Math.round((quizScore / total) * 100);
+        const msg = pct >= 80 ? "🔥 Excellent!" : pct >= 50 ? "👍 Good effort!" : "📚 Keep practicing!";
+        quizView.innerHTML =
+          '<div class="quizend"><h3>' + msg + '</h3>'
+          + '<p class="score">' + quizScore + ' / ' + total + '  (' + pct + '%)</p>'
+          + '<button class="primary" onclick="restartQuiz()">Restart quiz</button></div>';
+        return;
+      }
+      const card = d.cards[quizIndex];
+      const pct = Math.round((quizIndex / total) * 100);
+      let html = '<div class="qbar"><div class="qbar-fill" style="width:' + pct + '%"></div></div>';
+      html += '<div class="quizcard">';
+      html += '<div class="progress">Question ' + (quizIndex + 1) + ' of ' + total + ' &middot; Score ' + quizScore + '</div>';
+      html += '<div class="qtext">' + escapeHtml(card.q) + '</div>';
+      if (quizRevealed) {
+        html += '<div class="atext">' + escapeHtml(card.a) + '</div>';
+        html += '<div class="gradebtns">'
+          + '<button class="missed" onclick="gradeCard(false)">Missed it</button>'
+          + '<button class="gotit" onclick="gradeCard(true)">Got it &check;</button></div>';
+      } else {
+        html += '<button class="primary" onclick="reveal()">Show answer</button>';
+      }
+      html += '</div>';
+      quizView.innerHTML = html;
+    }
+
+    function reveal() { quizRevealed = true; renderQuiz(); }
+    function gradeCard(correct) {
+      if (correct) quizScore++;
+      quizIndex++;
+      quizRevealed = false;
+      renderQuiz();
+    }
+    function restartQuiz() { quizIndex = 0; quizScore = 0; quizRevealed = false; renderQuiz(); }
 
     async function generate() {
       const notes = notesEl.value.trim();
       if (!notes) { setStatus("Please paste some notes first.", true); return; }
-
-      grid.innerHTML = "";
       setStatus("Making your flashcards...");
       genBtn.disabled = true;
 
@@ -97,12 +305,11 @@
             text: "You are a study assistant. From the user's notes, create clear, "
               + "concise flashcards covering the key concepts. Make 8-12 cards. "
               + "Each 'q' is a short question; each 'a' is a short, correct answer. "
-              + "Respond ONLY with a JSON array of objects like "
+              + "Respond ONLY with a JSON array like "
               + '[{"q":"...","a":"..."}].',
           }],
         },
         contents: [{ role: "user", parts: [{ text: notes }] }],
-        // Ask Gemini to return clean JSON we can parse directly.
         generationConfig: { temperature: 0.4, responseMimeType: "application/json" },
       };
 
@@ -120,8 +327,14 @@
         const cards = parseCards(raw);
         if (!cards.length) throw new Error("Could not read any flashcards from the response.");
 
-        renderCards(cards);
-        setStatus(cards.length + " flashcards ready — click any card to flip it.");
+        const words = notes.split(/\s+/).slice(0, 5).join(" ");
+        const name = (words.length > 40 ? words.slice(0, 40) + "…" : words) || ("Deck " + (decks.length + 1));
+        const deck = { id: String(Date.now()), name, cards };
+        decks.unshift(deck);
+        activeId = deck.id;
+        saveDecks();
+        renderSidebar();
+        openDeck(deck.id);
       } catch (err) {
         setStatus("Error: " + err.message, true);
       } finally {
@@ -129,47 +342,23 @@
       }
     }
 
-    // Turn the AI's reply into an array of {q, a}. Strips code fences if present.
     function parseCards(raw) {
       if (!raw) return [];
       let text = raw.trim().replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "");
       try {
         const arr = JSON.parse(text);
         return Array.isArray(arr) ? arr.filter((c) => c && c.q && c.a) : [];
-      } catch (e) {
-        return [];
-      }
-    }
-
-    function renderCards(cards) {
-      grid.innerHTML = "";
-      cards.forEach((card) => {
-        const el = document.createElement("div");
-        el.className = "card";
-        const label = document.createElement("div");
-        label.className = "label";
-        label.textContent = "Question";
-        const text = document.createElement("div");
-        text.className = "text";
-        text.textContent = card.q;
-        el.appendChild(label);
-        el.appendChild(text);
-        // Click flips between question and answer.
-        let showingAnswer = false;
-        el.addEventListener("click", () => {
-          showingAnswer = !showingAnswer;
-          el.classList.toggle("flipped", showingAnswer);
-          label.textContent = showingAnswer ? "Answer" : "Question";
-          text.textContent = showingAnswer ? card.a : card.q;
-        });
-        grid.appendChild(el);
-      });
+      } catch (e) { return []; }
     }
 
     function setStatus(msg, isError) {
       statusEl.textContent = msg;
       statusEl.className = "status" + (isError ? " error" : "");
     }
+
+    loadDecks();
+    renderSidebar();
+    if (activeDeck()) openDeck(activeId); else showCreate();
   </script>
 </body>
 </html>
