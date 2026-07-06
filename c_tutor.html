@@ -9,15 +9,20 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
+      background:
+        radial-gradient(720px 520px at 6% -5%, #3a2a6b 0%, transparent 55%),
+        radial-gradient(820px 620px at 104% 105%, #0e4a6b 0%, transparent 52%),
+        #0b1020;
+      color: #e2e8f0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
     }
-    .app { width: 100%; max-width: 1000px; height: 100vh; display: flex; }
+    .app {
+      width: 100%; max-width: 1040px; height: calc(100vh - 40px); display: flex;
+      background: #0f172a; border: 1px solid #263351; border-radius: 18px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5); overflow: hidden;
+    }
 
-    /* ---- Sidebar: list of saved chats ---- */
+    /* ---- Sidebar ---- */
     .sidebar {
       width: 230px; flex-shrink: 0; background: #0b1220; border-right: 1px solid #1e293b;
       display: flex; flex-direction: column; padding: 12px; gap: 10px;
@@ -38,20 +43,24 @@
     .chat-del { border: none; background: transparent; color: #64748b; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px 0 6px; }
     .chat-del:hover { color: #f87171; }
 
-    /* ---- Main chat area ---- */
+    /* ---- Main ---- */
     .main { flex: 1; display: flex; flex-direction: column; padding: 16px; min-width: 0; }
     header { padding: 6px 4px 12px; }
     header h1 { font-size: 1.25rem; }
     header p { color: #94a3b8; font-size: 0.85rem; }
 
-    .styleBar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; color: #94a3b8; }
+    .styleBar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; color: #94a3b8; flex-wrap: wrap; }
     .styleBar select {
       padding: 7px 10px; border: 1px solid #334155; border-radius: 8px;
       background: #0b1220; color: #e2e8f0; font-size: 0.9rem;
     }
 
     .messages { flex: 1; overflow-y: auto; padding: 8px 4px; display: flex; flex-direction: column; gap: 12px; }
-    .msg { max-width: 88%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; line-height: 1.5; font-size: 0.95rem; }
+    .msg {
+      max-width: 88%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap;
+      line-height: 1.5; font-size: 0.95rem; animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     .user { background: #1e40af; align-self: flex-end; border-bottom-right-radius: 3px; }
     .bot { background: #1e293b; align-self: flex-start; border-bottom-left-radius: 3px; }
     .code-wrap { position: relative; }
@@ -61,23 +70,44 @@
       font-family: Consolas, Menlo, monospace; font-size: 0.85rem; white-space: pre;
     }
     .bot code { background: #0b1220; padding: 1px 5px; border-radius: 4px; font-family: Consolas, Menlo, monospace; font-size: 0.85rem; }
+    .bot pre .tok-c { color: #6b7280; font-style: italic; }
+    .bot pre .tok-s { color: #9ece6a; }
+    .bot pre .tok-n { color: #ff9e64; }
+    .bot pre .tok-k { color: #7aa2f7; }
     .copy-btn {
       position: absolute; top: 8px; right: 8px; border: none; border-radius: 6px;
       background: #334155; color: #e2e8f0; font-size: 0.72rem; font-weight: 600;
       padding: 4px 9px; cursor: pointer; opacity: 0.85;
     }
     .copy-btn:hover { opacity: 1; }
-    .empty { color: #64748b; text-align: center; margin: auto; font-size: 0.9rem; }
 
-    .composer { display: flex; gap: 8px; padding-top: 10px; }
+    /* Animated typing indicator */
+    .typing { display: inline-flex; gap: 5px; align-items: center; padding: 2px 0; }
+    .typing span { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; display: inline-block; animation: blink 1.2s infinite ease-in-out; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-5px); opacity: 1; } }
+
+    /* Welcome screen with clickable example prompts */
+    .welcome { margin: auto; text-align: center; color: #94a3b8; max-width: 480px; padding: 20px; }
+    .welcome .wave { font-size: 2.4rem; }
+    .welcome h2 { color: #e2e8f0; font-size: 1.3rem; margin: 8px 0 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+    .chip {
+      border: 1px solid #334155; background: #1e293b; color: #cbd5e1; border-radius: 999px;
+      padding: 8px 14px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+    }
+    .chip:hover { border-color: #38bdf8; color: #fff; }
+
+    .composer { display: flex; gap: 8px; padding-top: 10px; align-items: flex-end; }
     .composer textarea {
-      flex: 1; resize: none; height: 52px; padding: 12px;
+      flex: 1; resize: none; min-height: 52px; max-height: 140px; overflow-y: auto; padding: 12px;
       border: 1px solid #334155; border-radius: 8px;
       background: #0b1220; color: #e2e8f0; font-size: 0.95rem; font-family: inherit;
     }
     .composer button {
       border: none; border-radius: 8px; background: #38bdf8; color: #04283b;
-      font-weight: 700; padding: 0 20px; cursor: pointer; font-size: 0.95rem;
+      font-weight: 700; padding: 0 20px; height: 52px; cursor: pointer; font-size: 0.95rem;
     }
     .composer button:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -126,7 +156,6 @@
   </div>
 
   <script>
-    // Backend (Cloudflare Worker) holds the API key secretly. None in this page.
     const WORKER_URL = "https://c-tutor.jkadvertising.workers.dev";
     const CHATS_KEY = "cTutorChats";
     const ACTIVE_KEY = "cTutorActiveId";
@@ -138,7 +167,14 @@
     const sendBtn = document.getElementById("send");
     const chatList = document.getElementById("chatList");
 
-    // All chats live here. Each chat: { id, title, messages: [...] }.
+    // Example prompts shown on the welcome screen.
+    const EXAMPLES = [
+      "Write a program to reverse a string",
+      "Explain recursion with an example",
+      "Array vs linked list — what's the difference?",
+      "Give me an easy practice problem",
+    ];
+
     let chats = [];
     let activeId = null;
 
@@ -157,19 +193,14 @@
     // ---- Chat management ----
     function newChat() {
       const chat = { id: String(Date.now()), title: "New chat", messages: [] };
-      chats.unshift(chat); // newest at the top
+      chats.unshift(chat);
       activeId = chat.id;
       saveChats();
       renderSidebar();
       renderMessages();
       inputEl.focus();
     }
-    function switchChat(id) {
-      activeId = id;
-      saveChats();
-      renderSidebar();
-      renderMessages();
-    }
+    function switchChat(id) { activeId = id; saveChats(); renderSidebar(); renderMessages(); }
     function deleteChat(id) {
       chats = chats.filter((c) => c.id !== id);
       if (!chats.length) { activeId = null; newChat(); return; }
@@ -199,12 +230,12 @@
         chatList.appendChild(item);
       });
     }
+
     function renderMessages() {
       messagesEl.innerHTML = "";
       const chat = activeChat();
       if (!chat || chat.messages.length === 0) {
-        messagesEl.innerHTML =
-          '<div class="empty">Ask me a coding question to begin. Example: "Write a program to reverse a string."</div>';
+        renderWelcome();
         return;
       }
       for (const m of chat.messages) {
@@ -212,17 +243,52 @@
       }
     }
 
+    // Welcome screen with clickable example prompts.
+    function renderWelcome() {
+      const box = document.createElement("div");
+      box.className = "welcome";
+      box.innerHTML =
+        '<div class="wave">👋</div>'
+        + "<h2>Hi! I'm your Code Tutor</h2>"
+        + "<p>Pick your language above, then ask me anything — or try one of these:</p>"
+        + '<div class="chips" id="chips"></div>';
+      messagesEl.appendChild(box);
+      const chips = box.querySelector("#chips");
+      EXAMPLES.forEach((ex) => {
+        const chip = document.createElement("button");
+        chip.className = "chip";
+        chip.textContent = ex;
+        chip.onclick = () => usePrompt(ex);
+        chips.appendChild(chip);
+      });
+    }
+
+    // Fill the input with a prompt and send it.
+    function usePrompt(text) { inputEl.value = text; send(); }
+
     function escapeHtml(t) {
       return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // Lightweight markdown — split on code fences so code is never altered.
+    // Lightweight syntax highlighting for code blocks (no external library).
+    function highlightCode(code) {
+      const s = escapeHtml(code);
+      const pat = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|\b(\d[\d.]*)\b|\b(if|else|elif|for|while|do|switch|case|break|continue|return|int|float|double|char|void|bool|long|short|unsigned|struct|class|def|public|private|protected|static|new|delete|import|from|include|const|let|var|function|print|printf|scanf|cout|cin|std|namespace|using|typedef|true|false|null|None|and|or|not|in|range|try|except|catch|throw|this|self)\b/g;
+      return s.replace(pat, (m, com, str, num, kw) => {
+        if (com) return '<span class="tok-c">' + com + '</span>';
+        if (str) return '<span class="tok-s">' + str + '</span>';
+        if (num) return '<span class="tok-n">' + num + '</span>';
+        if (kw) return '<span class="tok-k">' + kw + '</span>';
+        return m;
+      });
+    }
+
     function format(text) {
       const parts = text.split(/```[a-zA-Z]*\n?/);
       let html = "";
       parts.forEach((part, i) => {
         if (i % 2 === 1) {
-          html += "<pre>" + escapeHtml(part.replace(/\n$/, "")) + "</pre>";
+          html += "<pre>" + highlightCode(part.replace(/\n$/, "")) + "</pre>";
         } else {
           let t = escapeHtml(part);
           t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -236,12 +302,23 @@
     }
 
     function addMessage(role, text) {
-      messagesEl.querySelector(".empty")?.remove();
+      messagesEl.querySelector(".welcome")?.remove();
       const div = document.createElement("div");
       div.className = "msg " + (role === "user" ? "user" : "bot");
       div.innerHTML = role === "user" ? escapeHtml(text) : format(text);
       messagesEl.appendChild(div);
       if (role !== "user") addCopyButtons(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return div;
+    }
+
+    // A bot bubble showing the animated typing dots.
+    function addTyping() {
+      messagesEl.querySelector(".welcome")?.remove();
+      const div = document.createElement("div");
+      div.className = "msg bot";
+      div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+      messagesEl.appendChild(div);
       messagesEl.scrollTop = messagesEl.scrollHeight;
       return div;
     }
@@ -299,6 +376,11 @@
         + (styles[styleSel.value] || styles.detailed);
     }
 
+    function resetInput() {
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+    }
+
     async function send() {
       const text = inputEl.value.trim();
       if (!text) return;
@@ -312,10 +394,10 @@
         renderSidebar();
       }
       saveChats();
-      inputEl.value = "";
+      resetInput();
       sendBtn.disabled = true;
 
-      const thinking = addMessage("bot", "Thinking...");
+      const thinking = addTyping();
       const payload = {
         systemInstruction: { parts: [{ text: systemText() }] },
         contents: chat.messages,
@@ -343,7 +425,7 @@
           lastError = err.message;
         }
         if (attempt < 3) {
-          thinking.textContent = "Server busy, retrying... (" + attempt + "/3)";
+          thinking.innerHTML = "Server busy, retrying... (" + attempt + "/3)";
           await new Promise((r) => setTimeout(r, 1500 * attempt));
         }
       }
@@ -361,8 +443,13 @@
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    // Enter to send; Shift+Enter for a new line; auto-grow the box.
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    inputEl.addEventListener("input", () => {
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
     });
 
     // ---- Startup ----
